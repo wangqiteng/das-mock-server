@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件上传测试</title>
+    <style>
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .file-info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>文件上传测试 - 验证重复弹窗修复</h1>
+    
+    <div class="upload-area" id="uploadArea">
+        <p>拖拽文件到此处或点击选择</p>
+        <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.md,.markdown,.txt" style="display: none;">
+        <button type="button" id="selectFileBtn">选择文件</button>
+    </div>
+    
+    <div class="file-info" id="fileInfo">
+        <p>已选择文件: <span id="fileName"></span></p>
+        <p>文件大小: <span id="fileSize"></span></p>
+        <p>处理次数: <span id="processCount">0</span></p>
+    </div>
+    
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const processCount = document.getElementById('processCount');
+        
+        let processCounter = 0;
+        let isProcessingFile = false;
+        
+        // 点击上传
+        selectFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        function handleFile(file) {
+            // 防止重复处理
+            if (isProcessingFile) {
+                console.log('文件正在处理中，跳过重复处理');
+                return;
+            }
+            isProcessingFile = true;
+            
+            try {
+                processCounter++;
+                processCount.textContent = processCounter;
+                
+                fileName.textContent = file.name;
+                fileSize.textContent = (file.size / 1024).toFixed(2) + ' KB';
+                fileInfo.style.display = 'block';
+                
+                console.log('处理文件:', file.name, '处理次数:', processCounter);
+                
+                // 模拟文件处理延迟
+                setTimeout(() => {
+                    console.log('文件处理完成:', file.name);
+                }, 500);
+                
+            } finally {
+                // 重置处理标志
+                setTimeout(() => {
+                    isProcessingFile = false;
+                }, 100);
+            }
+        }
+    </script>
+</body>
+</html> 

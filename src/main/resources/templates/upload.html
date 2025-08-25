@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上传文档 - Mock Server Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+        .file-preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 5px;
+        }
+        .progress-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-code me-2"></i>Mock Server Generator
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/upload">
+                            <i class="fas fa-upload me-1"></i>上传文档
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/manage">
+                            <i class="fas fa-cogs me-1"></i>服务管理
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/api-docs">
+                            <i class="fas fa-book me-1"></i>API文档
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-upload me-2"></i>上传API文档
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="uploadForm" enctype="multipart/form-data">
+                            <!-- 文件上传区域 -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">选择API文档</label>
+                                <div class="upload-area" id="uploadArea">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                    <h5>拖拽文件到此处或点击选择</h5>
+                                    <p class="text-muted mb-3">支持 PDF、Word、Markdown、TXT 格式</p>
+                                    <input type="file" id="fileInput" name="file" accept=".pdf,.docx,.doc,.md,.markdown,.txt" style="display: none;">
+                                    <button type="button" class="btn btn-outline-primary" id="selectFileBtn">
+                                        <i class="fas fa-folder-open me-2"></i>选择文件
+                                    </button>
+                                </div>
+                                <div id="filePreview" class="mt-3" style="display: none;">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-file me-2"></i>
+                                        <span id="fileName"></span>
+                                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removeFile()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 服务配置 -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="serviceName" class="form-label fw-bold">服务名称 *</label>
+                                    <input type="text" class="form-control" id="serviceName" name="serviceName" required>
+                                    <div class="form-text">为您的Mock Server指定一个名称</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="port" class="form-label fw-bold">服务端口 *</label>
+                                    <input type="number" class="form-control" id="port" name="port" value="8081" min="1024" max="65535" required>
+                                    <div class="form-text">Mock Server运行的端口号</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="description" class="form-label fw-bold">服务描述</label>
+                                <textarea class="form-control" id="description" name="description" rows="3" placeholder="描述您的Mock Server用途..."></textarea>
+                            </div>
+
+                            <!-- 进度条 -->
+                            <div class="progress-container" id="progressContainer">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="fw-bold">正在生成Mock Server...</span>
+                                    <span id="progressText">0%</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted" id="progressDetail">正在解析文档...</small>
+                                </div>
+                            </div>
+
+                            <!-- 提交按钮 -->
+                            <div class="d-flex gap-3">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                    <i class="fas fa-magic me-2"></i>生成Mock Server
+                                </button>
+                                <a href="/" class="btn btn-outline-secondary btn-lg">
+                                    <i class="fas fa-arrow-left me-2"></i>返回首页
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 支持格式说明 -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>支持的文件格式
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                                    <span>PDF文档</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-file-word text-primary me-2"></i>
+                                    <span>Word文档</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-file-alt text-success me-2"></i>
+                                    <span>Markdown</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-file-text text-secondary me-2"></i>
+                                    <span>文本文件</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const uploadForm = document.getElementById('uploadForm');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const progressDetail = document.getElementById('progressDetail');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        // 防止重复处理文件的标志
+        let isProcessingFile = false;
+
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // 点击上传
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        selectFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 阻止事件冒泡
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // 防止重复处理
+            if (isProcessingFile) {
+                return;
+            }
+            isProcessingFile = true;
+            
+            try {
+                // 验证文件格式
+                const allowedTypes = ['.pdf', '.docx', '.doc', '.md', '.markdown', '.txt'];
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                
+                if (!allowedTypes.includes(fileExtension)) {
+                    alert('不支持的文件格式！请选择 PDF、Word、Markdown 或 TXT 文件。');
+                    return;
+                }
+
+                // 验证文件大小（10MB）
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('文件大小不能超过10MB！');
+                    return;
+                }
+
+                fileName.textContent = file.name;
+                filePreview.style.display = 'block';
+                
+                // 正确设置文件到input元素
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                
+                // 自动生成服务名称
+                const name = file.name.replace(/\.[^/.]+$/, ""); // 移除扩展名
+                document.getElementById('serviceName').value = name + '-mock-server';
+            } finally {
+                // 重置处理标志
+                setTimeout(() => {
+                    isProcessingFile = false;
+                }, 100);
+            }
+        }
+
+        function removeFile() {
+            fileInput.value = '';
+            filePreview.style.display = 'none';
+        }
+
+        // 表单提交
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!fileInput.files[0]) {
+                alert('请选择要上传的文件！');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('serviceName', document.getElementById('serviceName').value);
+            formData.append('description', document.getElementById('description').value);
+            formData.append('port', document.getElementById('port').value);
+
+            // 显示进度条
+            progressContainer.style.display = 'block';
+            submitBtn.disabled = true;
+            
+            // 模拟进度更新
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                updateProgress(progress, '正在生成代码...');
+            }, 1000);
+
+            try {
+                const response = await fetch('/api/mock-server/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                
+                if (response.ok) {
+                    updateProgress(100, '生成完成！');
+                    progressDetail.textContent = 'Mock Server生成成功！';
+                    
+                    setTimeout(async () => {
+                        const result = await response.json();
+                        window.location.href = `/service/${result.id}`;
+                    }, 1000);
+                } else {
+                    throw new Error('生成失败');
+                }
+            } catch (error) {
+                clearInterval(progressInterval);
+                progressContainer.style.display = 'none';
+                submitBtn.disabled = false;
+                alert('生成Mock Server失败：' + error.message);
+            }
+        });
+
+        function updateProgress(percent, detail) {
+            progressBar.style.width = percent + '%';
+            progressText.textContent = Math.round(percent) + '%';
+            progressDetail.textContent = detail;
+        }
+
+
+    </script>
+</body>
+</html> 
