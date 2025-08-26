@@ -32,6 +32,9 @@ public class MockService {
     
     private String documentType;
     
+    @Column(columnDefinition = "TEXT")
+    private String projectPath;
+    
     @OneToMany(mappedBy = "mockService", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ApiEndpoint> endpoints = new ArrayList<>();
     
@@ -116,6 +119,14 @@ public class MockService {
     
     public void setDocumentType(String documentType) {
         this.documentType = documentType;
+    }
+    
+    public String getProjectPath() {
+        return projectPath;
+    }
+    
+    public void setProjectPath(String projectPath) {
+        this.projectPath = projectPath;
     }
     
     public List<ApiEndpoint> getEndpoints() {

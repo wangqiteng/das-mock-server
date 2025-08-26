@@ -31,6 +31,27 @@
         .progress-container {
             display: none;
         }
+        
+        /* 固定菜单项宽度，防止位置变化 */
+        .navbar-nav .nav-item {
+            min-width: 100px;
+            text-align: center;
+        }
+        
+        .navbar-nav .nav-link {
+            white-space: nowrap;
+            padding: 0.5rem 1rem;
+        }
+        
+        /* 确保导航栏布局稳定 */
+        .navbar-collapse {
+            flex-grow: 1;
+        }
+        
+        .navbar-nav {
+            width: 100%;
+            justify-content: flex-start;
+        }
     </style>
 </head>
 <body>
@@ -38,13 +59,18 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <i class="fas fa-code me-2"></i>Mock Server Generator
+                <i class="fas fa-magic me-2"></i>Mock Server Generator
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link active" href="/upload">
                             <i class="fas fa-upload me-1"></i>上传文档
@@ -185,6 +211,20 @@
         </div>
     </div>
 
+    <!-- Toast通知容器 -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1050;">
+        <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i id="toastIcon" class="fas fa-info-circle me-2"></i>
+                <strong id="toastTitle" class="me-auto">通知</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div id="toastBody" class="toast-body">
+                操作完成
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const uploadArea = document.getElementById('uploadArea');
@@ -197,6 +237,45 @@
         const progressText = document.getElementById('progressText');
         const progressDetail = document.getElementById('progressDetail');
         const submitBtn = document.getElementById('submitBtn');
+        
+        // Toast通知函数
+        function showToast(type, title, message) {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastBody = document.getElementById('toastBody');
+            
+            // 设置图标和颜色
+            let iconClass = 'fas fa-info-circle';
+            let headerClass = '';
+            
+            switch(type) {
+                case 'success':
+                    iconClass = 'fas fa-check-circle text-success';
+                    headerClass = 'text-success';
+                    break;
+                case 'error':
+                    iconClass = 'fas fa-exclamation-circle text-danger';
+                    headerClass = 'text-danger';
+                    break;
+                case 'warning':
+                    iconClass = 'fas fa-exclamation-triangle text-warning';
+                    headerClass = 'text-warning';
+                    break;
+                case 'info':
+                    iconClass = 'fas fa-info-circle text-info';
+                    headerClass = 'text-info';
+                    break;
+            }
+            
+            toastIcon.className = iconClass;
+            toastTitle.className = `me-auto ${headerClass}`;
+            toastTitle.textContent = title;
+            toastBody.textContent = message;
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
         
         // 防止重复处理文件的标志
         let isProcessingFile = false;
@@ -246,13 +325,13 @@
                 const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
                 
                 if (!allowedTypes.includes(fileExtension)) {
-                    alert('不支持的文件格式！请选择 PDF、Word、Markdown 或 TXT 文件。');
+                    showToast('error', '文件格式错误', '不支持的文件格式！请选择 PDF、Word、Markdown 或 TXT 文件。');
                     return;
                 }
 
                 // 验证文件大小（10MB）
                 if (file.size > 10 * 1024 * 1024) {
-                    alert('文件大小不能超过10MB！');
+                    showToast('error', '文件过大', '文件大小不能超过10MB！');
                     return;
                 }
 
@@ -285,7 +364,7 @@
             e.preventDefault();
             
             if (!fileInput.files[0]) {
-                alert('请选择要上传的文件！');
+                showToast('warning', '请选择文件', '请选择要上传的文件！');
                 return;
             }
 
@@ -330,7 +409,7 @@
                 clearInterval(progressInterval);
                 progressContainer.style.display = 'none';
                 submitBtn.disabled = false;
-                alert('生成Mock Server失败：' + error.message);
+                showToast('error', '生成失败', '生成Mock Server失败：' + error.message);
             }
         });
 

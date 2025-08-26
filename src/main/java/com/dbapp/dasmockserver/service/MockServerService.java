@@ -4,6 +4,7 @@ import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.repository.ApiEndpointRepository;
 import com.dbapp.dasmockserver.repository.MockServiceRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 @Service
 @Transactional
+@Slf4j
 public class MockServerService {
     
     @Autowired
@@ -31,6 +33,9 @@ public class MockServerService {
     
     @Autowired
     private CodeGenerationService codeGenerationService;
+    
+    @Autowired
+    private ProcessManagementService processManagementService;
     
     /**
      * 创建新的Mock服务
@@ -84,8 +89,9 @@ public class MockServerService {
             
             // 生成代码项目
             String projectPath = codeGenerationService.generateMockServerProject(mockService, endpoints);
+            mockService.setProjectPath(projectPath);
             mockService.setBaseUrl("http://localhost:" + port);
-            
+            log.info("Mock服务生成成功，项目路径: {},访问路径: {}", projectPath,mockService.getBaseUrl());
             mockService.setStatus(MockService.ServiceStatus.CREATED);
             mockServiceRepository.save(mockService);
             
@@ -173,25 +179,68 @@ public class MockServerService {
     /**
      * 启动Mock服务
      */
-    public void startMockService(Long serviceId) {
+    public boolean startMockService(Long serviceId) {
         Optional<MockService> optional = mockServiceRepository.findById(serviceId);
         if (optional.isPresent()) {
             MockService mockService = optional.get();
-            mockService.setStatus(MockService.ServiceStatus.RUNNING);
-            mockServiceRepository.save(mockService);
+            
+            // 检查服务是否已经在运行
+            if (processManagementService.isServiceRunning(serviceId)) {
+                log.warn("服务 {} 已经在运行中", serviceId);
+                mockService.setStatus(MockService.ServiceStatus.RUNNING);
+                mockServiceRepository.save(mockService);
+                return true;
+            }
+            
+            // 从数据库获取项目路径
+            String projectPath = mockService.getProjectPath();
+            if (projectPath == null || projectPath.trim().isEmpty()) {
+                log.error("服务 {} 的项目路径为空", serviceId);
+                mockService.setStatus(MockService.ServiceStatus.ERROR);
+                mockServiceRepository.save(mockService);
+                return false;
+            }
+            
+            // 启动进程
+            boolean started = processManagementService.startMockServer(serviceId, projectPath, mockService.getPort());
+            
+            if (started) {
+                mockService.setStatus(MockService.ServiceStatus.RUNNING);
+                mockServiceRepository.save(mockService);
+                log.info("Mock服务启动成功: serviceId={}, port={}", serviceId, mockService.getPort());
+                return true;
+            } else {
+                mockService.setStatus(MockService.ServiceStatus.ERROR);
+                mockServiceRepository.save(mockService);
+                log.error("Mock服务启动失败: serviceId={}", serviceId);
+                return false;
+            }
         }
+        return false;
     }
     
     /**
      * 停止Mock服务
      */
-    public void stopMockService(Long serviceId) {
+    public boolean stopMockService(Long serviceId) {
         Optional<MockService> optional = mockServiceRepository.findById(serviceId);
         if (optional.isPresent()) {
             MockService mockService = optional.get();
-            mockService.setStatus(MockService.ServiceStatus.STOPPED);
-            mockServiceRepository.save(mockService);
+            
+            // 停止进程
+            boolean stopped = processManagementService.stopMockServer(serviceId);
+            
+            if (stopped) {
+                mockService.setStatus(MockService.ServiceStatus.STOPPED);
+                mockServiceRepository.save(mockService);
+                log.info("Mock服务停止成功: serviceId={}", serviceId);
+                return true;
+            } else {
+                log.error("Mock服务停止失败: serviceId={}", serviceId);
+                return false;
+            }
         }
+        return false;
     }
     
     /**
@@ -204,8 +253,33 @@ public class MockServerService {
             List<ApiEndpoint> endpoints = apiEndpointRepository.findByMockServiceId(serviceId);
             
             // 重新生成代码项目
-            codeGenerationService.generateMockServerProject(mockService, endpoints);
+            String projectPath = codeGenerationService.generateMockServerProject(mockService, endpoints);
+            mockService.setProjectPath(projectPath);
+            mockServiceRepository.save(mockService);
         }
+    }
+    
+
+    
+    /**
+     * 检查服务是否正在运行
+     */
+    public boolean isServiceRunning(Long serviceId) {
+        return processManagementService.isServiceRunning(serviceId);
+    }
+    
+    /**
+     * 获取服务进程ID
+     */
+    public Long getServiceProcessId(Long serviceId) {
+        return processManagementService.getProcessId(serviceId);
+    }
+    
+    /**
+     * 获取服务日志
+     */
+    public String getServiceLog(Long serviceId) {
+        return processManagementService.getServiceLog(serviceId);
     }
     
     /**

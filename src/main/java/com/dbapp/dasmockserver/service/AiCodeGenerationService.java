@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@Slf4j
 public class AiCodeGenerationService {
     
     @Autowired(required = false)
@@ -64,7 +66,10 @@ public class AiCodeGenerationService {
         
         String prompt = buildMockResponsePrompt(endpoint);
         
-        return chatClient.prompt().user(prompt).call().content();
+        String response = chatClient.prompt().user(prompt).call().content();
+        
+        // 清理响应，移除markdown格式
+        return cleanMockResponse(response);
     }
     
     /**
@@ -101,9 +106,15 @@ public class AiCodeGenerationService {
     private String buildCodeGenerationPrompt(MockService mockService, List<ApiEndpoint> endpoints) {
         StringBuilder endpointsJson = new StringBuilder();
         for (ApiEndpoint endpoint : endpoints) {
+            // 生成安全的Java标识符
+            String className = generateClassName(endpoint.getName());
+            String methodName = generateMethodName(endpoint.getName());
+            
             endpointsJson.append(String.format("""
                 {
                     "name": "%s",
+                    "className": "%s",
+                    "methodName": "%s",
                     "path": "%s",
                     "method": "%s",
                     "description": "%s",
@@ -112,6 +123,8 @@ public class AiCodeGenerationService {
                 },
                 """, 
                 endpoint.getName(),
+                className,
+                methodName,
                 endpoint.getPath(),
                 endpoint.getMethod().name(),
                 endpoint.getDescription() != null ? endpoint.getDescription() : "",
@@ -120,11 +133,17 @@ public class AiCodeGenerationService {
             ));
         }
         
+        // 生成安全的服务名称
+        String serviceClassName = generateClassName(mockService.getName());
+        String packageName = generatePackageName(mockService.getName());
+        
         return String.format("""
             请为以下API端点生成一个完整的Spring Boot Mock Server代码。
             
             服务信息：
             - 服务名称: %s
+            - 服务类名: %s
+            - 包名: %s
             - 服务描述: %s
             - 端口: %d
             
@@ -132,8 +151,8 @@ public class AiCodeGenerationService {
             %s
             
             请生成以下文件：
-            1. 主应用类 (Application.java)
-            2. 控制器类 (Controller.java)
+            1. 主应用类 (%sApplication.java)
+            2. 控制器类 (%sController.java)
             3. 数据模型类 (DTO.java)
             4. 配置文件 (application.properties)
             5. pom.xml
@@ -146,13 +165,19 @@ public class AiCodeGenerationService {
             5. 支持动态响应延迟
             6. 包含错误处理
             7. 代码要完整可运行
+            8. 使用提供的类名和方法名
+            9. 确保所有标识符符合Java命名规范
             
             请按文件分别返回，每个文件用```java开始，```结束。
             """, 
             mockService.getName(),
+            serviceClassName,
+            packageName,
             mockService.getDescription() != null ? mockService.getDescription() : "",
             mockService.getPort(),
-            endpointsJson.toString()
+            endpointsJson.toString(),
+            serviceClassName,
+            serviceClassName
         );
     }
     
@@ -284,6 +309,238 @@ public class AiCodeGenerationService {
     }
     
     /**
+     * 生成Java类名，排除特殊符号
+     */
+    public String generateClassName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "DefaultClass";
+        }
+        
+        // 移除特殊符号，只保留字母、数字和下划线
+        String cleaned = name.replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fa5]", "");
+        
+        // 如果清理后为空，使用默认名称
+        if (cleaned.trim().isEmpty()) {
+            return "DefaultClass";
+        }
+        
+        // 确保首字母大写（Java类名规范）
+        String result = cleaned.substring(0, 1).toUpperCase() + cleaned.substring(1);
+        
+        // 如果以数字开头，添加前缀
+        if (Character.isDigit(result.charAt(0))) {
+            result = "Class" + result;
+        }
+        
+        // 限制长度，避免过长
+        if (result.length() > 50) {
+            result = result.substring(0, 50);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 生成Java方法名，从路径中提取最后两个单词，使用驼峰写法
+     */
+    public String generateMethodName(String path) {
+        if (path == null || path.trim().isEmpty()) {
+            return "defaultMethod";
+        }
+        
+        // 移除开头的斜杠
+        String cleanPath = path.trim();
+        if (cleanPath.startsWith("/")) {
+            cleanPath = cleanPath.substring(1);
+        }
+        
+        // 移除结尾的斜杠
+        if (cleanPath.endsWith("/")) {
+            cleanPath = cleanPath.substring(0, cleanPath.length() - 1);
+        }
+        
+        // 按斜杠分割路径
+        String[] pathParts = cleanPath.split("/");
+        
+        // 过滤掉空字符串和版本号（如v1.0, v2等）
+        List<String> meaningfulParts = new ArrayList<>();
+        for (String part : pathParts) {
+            if (!part.isEmpty() && !part.matches("^v\\d+(\\.\\d+)*$")) {
+                meaningfulParts.add(part);
+            }
+        }
+        
+        // 如果路径部分太少，使用默认方法名
+        if (meaningfulParts.size() < 1) {
+            return "defaultMethod";
+        }
+        
+        // 如果路径部分大于2，取最后两个单词
+        List<String> selectedParts;
+        if (meaningfulParts.size() > 2) {
+            selectedParts = meaningfulParts.subList(meaningfulParts.size() - 2, meaningfulParts.size());
+        } else {
+            // 如果路径部分小于等于2，使用所有部分
+            selectedParts = meaningfulParts;
+        }
+        
+        // 构建方法名
+        StringBuilder methodName = new StringBuilder();
+        
+        for (int i = 0; i < selectedParts.size(); i++) {
+            String part = selectedParts.get(i);
+            
+            // 处理路径参数 {param}
+            if (part.startsWith("{") && part.endsWith("}")) {
+                // 提取参数名，移除大括号
+                String paramName = part.substring(1, part.length() - 1);
+                // 清理参数名，移除特殊字符
+                paramName = paramName.replaceAll("[^a-zA-Z0-9_]", "");
+                if (!paramName.isEmpty()) {
+                    part = paramName;
+                } else {
+                    part = "param";
+                }
+            }
+            
+            // 移除特殊符号，只保留字母、数字和下划线
+            String cleanedPart = part.replaceAll("[^a-zA-Z0-9_]", "");
+            
+            if (!cleanedPart.isEmpty()) {
+                if (i == 0) {
+                    // 第一个部分首字母小写
+                    methodName.append(cleanedPart.toLowerCase());
+                } else {
+                    // 后续部分首字母大写（驼峰命名）
+                    methodName.append(cleanedPart.substring(0, 1).toUpperCase())
+                             .append(cleanedPart.substring(1).toLowerCase());
+                }
+            }
+        }
+        
+        String result = methodName.toString();
+        
+        // 如果结果为空，使用默认名称
+        if (result.trim().isEmpty()) {
+            return "defaultMethod";
+        }
+        
+        // 确保首字母小写（Java方法名规范）
+        if (result.length() > 0) {
+            result = result.substring(0, 1).toLowerCase() + result.substring(1);
+        }
+        
+        // 如果以数字开头，添加前缀
+        if (result.length() > 0 && Character.isDigit(result.charAt(0))) {
+            result = "method" + result;
+        }
+        
+        // 限制长度，避免过长
+        if (result.length() > 50) {
+            result = result.substring(0, 50);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 生成Java变量名，排除特殊符号
+     */
+    public String generateVariableName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "defaultVariable";
+        }
+        
+        // 处理常见的命名模式
+        String processed = name;
+        
+        // 处理连字符分隔的命名（如 user-name -> userName）
+        if (processed.contains("-")) {
+            String[] parts = processed.split("-");
+            StringBuilder result = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                String part = parts[i];
+                if (i == 0) {
+                    result.append(part.toLowerCase());
+                } else {
+                    result.append(part.substring(0, 1).toUpperCase()).append(part.substring(1).toLowerCase());
+                }
+            }
+            processed = result.toString();
+        }
+        
+        // 处理下划线分隔的命名（如 user_id -> userId）
+        if (processed.contains("_")) {
+            String[] parts = processed.split("_");
+            StringBuilder result = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                String part = parts[i];
+                if (i == 0) {
+                    result.append(part.toLowerCase());
+                } else {
+                    result.append(part.substring(0, 1).toUpperCase()).append(part.substring(1).toLowerCase());
+                }
+            }
+            processed = result.toString();
+        }
+        
+        // 移除特殊符号，只保留字母、数字和下划线
+        String cleaned = processed.replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fa5]", "");
+        
+        // 如果清理后为空，使用默认名称
+        if (cleaned.trim().isEmpty()) {
+            return "defaultVariable";
+        }
+        
+        // 确保首字母小写（Java变量名规范）
+        String result = cleaned.substring(0, 1).toLowerCase() + cleaned.substring(1);
+        
+        // 如果以数字开头，添加前缀
+        if (Character.isDigit(result.charAt(0))) {
+            result = "var" + result;
+        }
+        
+        // 限制长度，避免过长
+        if (result.length() > 50) {
+            result = result.substring(0, 50);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 生成Java包名，排除特殊符号
+     */
+    public String generatePackageName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "com.example";
+        }
+        
+        // 处理连字符和下划线，转换为点分隔
+        String processed = name.replaceAll("[-_]", ".");
+        
+        // 移除特殊符号，只保留字母、数字和点
+        String cleaned = processed.replaceAll("[^a-zA-Z0-9.]", "");
+        
+        // 如果清理后为空，使用默认名称
+        if (cleaned.trim().isEmpty()) {
+            return "com.example";
+        }
+        
+        // 确保不以数字开头
+        if (Character.isDigit(cleaned.charAt(0))) {
+            cleaned = "pkg" + cleaned;
+        }
+        
+        // 限制长度
+        if (cleaned.length() > 100) {
+            cleaned = cleaned.substring(0, 100);
+        }
+        
+        return cleaned.toLowerCase();
+    }
+    
+    /**
      * 生成默认的Mock Server代码
      */
     private String generateDefaultMockServerCode(MockService mockService, List<ApiEndpoint> endpoints) {
@@ -300,6 +557,42 @@ public class AiCodeGenerationService {
             mockService.getPort(),
             endpoints.size()
         );
+    }
+    
+    /**
+     * 清理Mock响应，移除markdown格式
+     */
+    private String cleanMockResponse(String response) {
+        if (response == null || response.trim().isEmpty()) {
+            return "{}";
+        }
+        
+        // 移除markdown代码块标记
+        String cleaned = response.trim();
+        
+        // 移除开头的 ```json 或 ```
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+        
+        // 移除结尾的 ```
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        
+        // 清理前后空白字符
+        cleaned = cleaned.trim();
+        
+        // 验证是否为有效的JSON
+        try {
+            objectMapper.readTree(cleaned);
+            return cleaned;
+        } catch (Exception e) {
+            log.warn("Invalid JSON in mock response, using default: {}", e.getMessage());
+            return "{}";
+        }
     }
     
     /**

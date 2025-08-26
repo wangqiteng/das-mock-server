@@ -98,18 +98,44 @@ public class MockServerController {
      * 启动Mock服务
      */
     @PostMapping("/services/{id}/start")
-    public ResponseEntity<Void> startMockService(@PathVariable Long id) {
-        mockServerService.startMockService(id);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> startMockService(@PathVariable Long id) {
+        boolean started = mockServerService.startMockService(id);
+        if (started) {
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Mock服务启动成功",
+                "serviceId", id
+            ));
+        } else {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                    "success", false,
+                    "message", "Mock服务启动失败",
+                    "serviceId", id
+                ));
+        }
     }
     
     /**
      * 停止Mock服务
      */
     @PostMapping("/services/{id}/stop")
-    public ResponseEntity<Void> stopMockService(@PathVariable Long id) {
-        mockServerService.stopMockService(id);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Map<String, Object>> stopMockService(@PathVariable Long id) {
+        boolean stopped = mockServerService.stopMockService(id);
+        if (stopped) {
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Mock服务停止成功",
+                "serviceId", id
+            ));
+        } else {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                    "success", false,
+                    "message", "Mock服务停止失败",
+                    "serviceId", id
+                ));
+        }
     }
     
     /**
@@ -140,6 +166,33 @@ public class MockServerController {
         
         MockService mockService = mockServerService.createMockService(name, description, port);
         return ResponseEntity.status(HttpStatus.CREATED).body(mockService);
+    }
+    
+    /**
+     * 检查服务运行状态
+     */
+    @GetMapping("/services/{id}/status")
+    public ResponseEntity<Map<String, Object>> getServiceStatus(@PathVariable Long id) {
+        boolean isRunning = mockServerService.isServiceRunning(id);
+        Long processId = mockServerService.getServiceProcessId(id);
+        
+        return ResponseEntity.ok(Map.of(
+            "serviceId", id,
+            "isRunning", isRunning,
+            "processId", processId != null ? processId : -1
+        ));
+    }
+    
+    /**
+     * 获取服务日志
+     */
+    @GetMapping("/services/{id}/logs")
+    public ResponseEntity<Map<String, Object>> getServiceLogs(@PathVariable Long id) {
+        String logs = mockServerService.getServiceLog(id);
+        return ResponseEntity.ok(Map.of(
+            "serviceId", id,
+            "logs", logs
+        ));
     }
     
     /**
