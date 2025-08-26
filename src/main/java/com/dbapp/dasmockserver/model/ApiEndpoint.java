@@ -34,6 +34,9 @@ public class ApiEndpoint {
     private String responseSchema;
     
     @Column(columnDefinition = "TEXT")
+    private String parameters;
+    
+    @Column(columnDefinition = "TEXT")
     private String mockResponse;
     
     private Integer responseDelay;
@@ -121,6 +124,14 @@ public class ApiEndpoint {
     
     public void setResponseSchema(String responseSchema) {
         this.responseSchema = responseSchema;
+    }
+    
+    public String getParameters() {
+        return parameters;
+    }
+    
+    public void setParameters(String parameters) {
+        this.parameters = parameters;
     }
     
     public String getMockResponse() {

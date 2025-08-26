@@ -122,19 +122,19 @@
                 <div class="d-flex gap-2 justify-content-end">
                     <button th:if="${service.status == 'RUNNING'}" 
                             th:data-service-id="${service.id}"
-                            onclick="stopService(this.getAttribute('data-service-id'))" 
-                            class="btn btn-outline-warning">
+                            data-action="stop"
+                            class="btn btn-outline-warning action-btn">
                         <i class="fas fa-stop me-1"></i>停止服务
                     </button>
                     <button th:if="${service.status != 'RUNNING'}" 
                             th:data-service-id="${service.id}"
-                            onclick="startService(this.getAttribute('data-service-id'))" 
-                            class="btn btn-outline-success">
+                            data-action="start"
+                            class="btn btn-outline-success action-btn">
                         <i class="fas fa-play me-1"></i>启动服务
                     </button>
                     <button th:data-service-id="${service.id}"
-                            onclick="regenerateService(this.getAttribute('data-service-id'))" 
-                            class="btn btn-outline-primary">
+                            data-action="regenerate"
+                            class="btn btn-outline-primary action-btn">
                         <i class="fas fa-sync me-1"></i>重新生成
                     </button>
                     <a th:href="@{'/service/' + ${service.id} + '/download'}" 
@@ -330,6 +330,55 @@
 
     <script src="/js/bootstrap.bundle.min.js"></script>
     <script>
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEventListeners();
+            checkServiceStatus();
+        });
+        
+        // 初始化事件监听器
+        function initializeEventListeners() {
+            // 为所有操作按钮添加点击事件
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.action-btn')) {
+                    const button = e.target.closest('.action-btn');
+                    const serviceId = button.getAttribute('data-service-id');
+                    const action = button.getAttribute('data-action');
+                    
+                    switch(action) {
+                        case 'start':
+                            startService(serviceId);
+                            break;
+                        case 'stop':
+                            stopService(serviceId);
+                            break;
+                        case 'regenerate':
+                            showConfirmDialog('fas fa-sync', '重新生成服务', 
+                                '确定要重新生成这个Mock服务吗？这将覆盖现有的代码。', 
+                                () => regenerateService(serviceId));
+                            break;
+                    }
+                }
+            });
+        }
+        
+        // 检查服务状态
+        function checkServiceStatus() {
+            const serviceId = document.querySelector('button[data-service-id]')?.getAttribute('data-service-id');
+            if (serviceId) {
+                fetch(`/api/mock-server/services/${serviceId}/status`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateServiceStatus(serviceId, data.status);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('检查服务状态失败:', error);
+                    });
+            }
+        }
+        
         // 确认对话框函数
         function showConfirmDialog(icon, title, message, onConfirm) {
             const modal = document.getElementById('confirmModal');
@@ -404,20 +453,7 @@
             console.log('startService called with serviceId:', serviceId);
             
             // 查找启动按钮
-            const buttonContainer = document.querySelector('.d-flex.gap-2.justify-content-end');
-            let startButton = null;
-            
-            if (buttonContainer) {
-                const allButtons = buttonContainer.querySelectorAll('button');
-                allButtons.forEach(button => {
-                    const buttonText = button.textContent || button.innerHTML;
-                    const onclick = button.getAttribute('onclick') || '';
-                    if (onclick.includes('startService') || buttonText.includes('启动')) {
-                        startButton = button;
-                    }
-                });
-            }
-            
+            const startButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="start"]`);
             console.log('Found start button:', startButton);
             
             if (startButton) {
@@ -469,20 +505,7 @@
             console.log('stopService called with serviceId:', serviceId);
             
             // 查找停止按钮
-            const buttonContainer = document.querySelector('.d-flex.gap-2.justify-content-end');
-            let stopButton = null;
-            
-            if (buttonContainer) {
-                const allButtons = buttonContainer.querySelectorAll('button');
-                allButtons.forEach(button => {
-                    const buttonText = button.textContent || button.innerHTML;
-                    const onclick = button.getAttribute('onclick') || '';
-                    if (onclick.includes('stopService') || buttonText.includes('停止')) {
-                        stopButton = button;
-                    }
-                });
-            }
-            
+            const stopButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="stop"]`);
             console.log('Found stop button:', stopButton);
             
             if (stopButton) {

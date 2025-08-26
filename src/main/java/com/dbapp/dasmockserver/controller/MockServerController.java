@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/mock-server")
@@ -179,14 +180,34 @@ public class MockServerController {
      */
     @GetMapping("/services/{id}/status")
     public ResponseEntity<Map<String, Object>> getServiceStatus(@PathVariable Long id) {
-        boolean isRunning = mockServerService.isServiceRunning(id);
-        Long processId = mockServerService.getServiceProcessId(id);
-        
-        return ResponseEntity.ok(Map.of(
-            "serviceId", id,
-            "isRunning", isRunning,
-            "processId", processId != null ? processId : -1
-        ));
+        try {
+            Optional<MockService> serviceOpt = mockServerService.getMockServiceById(id);
+            if (serviceOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            MockService service = serviceOpt.get();
+            
+            boolean isRunning = mockServerService.isServiceRunning(id);
+            Long processId = mockServerService.getServiceProcessId(id);
+            
+            // 根据运行状态确定服务状态
+            String status = isRunning ? "RUNNING" : "STOPPED";
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "serviceId", id,
+                "status", status,
+                "isRunning", isRunning,
+                "processId", processId != null ? processId : -1
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "serviceId", id,
+                "status", "ERROR",
+                "message", "检查服务状态时发生错误: " + e.getMessage()
+            ));
+        }
     }
     
     /**

@@ -16,9 +16,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class CodeGenerationService {
@@ -168,9 +171,13 @@ public class CodeGenerationService {
                 .addMember("origins", "$S", "*")
                 .build());
         
+        // 用于跟踪已使用的方法名，确保不重复
+        Set<String> usedMethodNames = new HashSet<>();
+        
         // 为每个端点生成方法
         for (ApiEndpoint endpoint : endpoints) {
-            controllerBuilder.addMethod(generateEndpointMethod(endpoint));
+            MethodSpec method = generateEndpointMethod(endpoint, usedMethodNames);
+            controllerBuilder.addMethod(method);
         }
         
         JavaFile javaFile = JavaFile.builder(packageName, controllerBuilder.build()).build();
@@ -180,8 +187,8 @@ public class CodeGenerationService {
     /**
      * 生成单个端点方法
      */
-    private MethodSpec generateEndpointMethod(ApiEndpoint endpoint) {
-        String methodName = generateMethodName(endpoint.getPath());
+    private MethodSpec generateEndpointMethod(ApiEndpoint endpoint, Set<String> usedMethodNames) {
+        String methodName = generateUniqueMethodName(endpoint.getPath(), usedMethodNames);
         
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
             .addModifiers(Modifier.PUBLIC)
@@ -190,51 +197,48 @@ public class CodeGenerationService {
         // 处理路径，移除重复的/api前缀
         String path = normalizePath(endpoint.getPath());
         
-        // 解析PathVariable参数
-        List<String> pathVariables = extractPathVariables(path);
+        // 解析参数信息
+        ParameterInfo parameterInfo = parseParameters(endpoint);
         
         // 添加PathVariable参数到方法签名
-        for (String pathVar : pathVariables) {
+        for (ParameterInfo.Parameter param : parameterInfo.getPathVariables()) {
+            ClassName paramType = getParameterType(param.getType());
             methodBuilder.addParameter(
-                ParameterSpec.builder(String.class, pathVar)
+                ParameterSpec.builder(paramType, param.getName())
                     .addAnnotation(AnnotationSpec.builder(
                         ClassName.get("org.springframework.web.bind.annotation", "PathVariable"))
-                        .addMember("value", "$S", pathVar)
+                        .addMember("value", "$S", param.getName())
                         .build())
                     .build()
             );
         }
         
-        // 根据HTTP方法添加请求参数
-        String httpMethod = endpoint.getMethod().name().toLowerCase();
-        if ("post".equals(httpMethod) || "put".equals(httpMethod) || "patch".equals(httpMethod)) {
-            // 添加请求体参数
+        // 添加QueryParameter参数到方法签名
+        for (ParameterInfo.Parameter param : parameterInfo.getQueryParameters()) {
+            ClassName paramType = getParameterType(param.getType());
+            methodBuilder.addParameter(
+                ParameterSpec.builder(paramType, param.getName())
+                    .addAnnotation(AnnotationSpec.builder(
+                        ClassName.get("org.springframework.web.bind.annotation", "RequestParam"))
+                        .addMember("value", "$S", param.getName())
+                        .addMember("required", "$L", param.isRequired())
+                        .build())
+                    .build()
+            );
+        }
+        
+        // 添加RequestBody参数到方法签名
+        if (parameterInfo.getRequestBody() != null && !parameterInfo.getRequestBody().getProperties().isEmpty()) {
             String requestClassName = generateClassName(endpoint.getName() + "Request");
             methodBuilder.addParameter(
                 ParameterSpec.builder(ClassName.get("com.dbapp." + sanitizeProjectName(endpoint.getMockService().getName()).toLowerCase() + ".dto", requestClassName), "request")
                     .addAnnotation(ClassName.get("org.springframework.web.bind.annotation", "RequestBody"))
                     .build()
             );
-        } else if ("get".equals(httpMethod)) {
-            // 添加查询参数
-            if (endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
-                // 解析请求参数并添加为@RequestParam
-                List<String> queryParams = parseQueryParameters(endpoint.getRequestSchema());
-                for (String param : queryParams) {
-                    methodBuilder.addParameter(
-                        ParameterSpec.builder(String.class, param)
-                            .addAnnotation(AnnotationSpec.builder(
-                                ClassName.get("org.springframework.web.bind.annotation", "RequestParam"))
-                                .addMember("value", "$S", param)
-                                .addMember("required", "false")
-                                .build())
-                            .build()
-                    );
-                }
-            }
         }
         
         // 添加HTTP方法注解
+        String httpMethod = endpoint.getMethod().name().toLowerCase();
         methodBuilder.addAnnotation(AnnotationSpec.builder(
             ClassName.get("org.springframework.web.bind.annotation", httpMethod.substring(0, 1).toUpperCase() + httpMethod.substring(1) + "Mapping"))
             .addMember("value", "$S", path)
@@ -247,7 +251,7 @@ public class CodeGenerationService {
             ClassName.get("java.lang", "Class"));
         
         // 生成详细的参数日志
-        generateDetailedParameterLog(methodBuilder, endpoint, pathVariables, httpMethod);
+        generateDetailedParameterLog(methodBuilder, endpoint, parameterInfo);
         
         // 添加响应延迟
         if (endpoint.getResponseDelay() != null && endpoint.getResponseDelay() > 0) {
@@ -941,6 +945,25 @@ public class CodeGenerationService {
     }
 
     /**
+     * 生成唯一的Java方法名，确保不重复
+     */
+    public String generateUniqueMethodName(String name, Set<String> usedMethodNames) {
+        String baseMethodName = generateMethodName(name);
+        String uniqueMethodName = baseMethodName;
+        int counter = 1;
+        
+        // 如果方法名已存在，添加数字后缀直到找到唯一的方法名
+        while (usedMethodNames.contains(uniqueMethodName)) {
+            uniqueMethodName = baseMethodName + counter;
+            counter++;
+        }
+        
+        // 将使用的方法名添加到集合中
+        usedMethodNames.add(uniqueMethodName);
+        return uniqueMethodName;
+    }
+    
+    /**
      * 生成Java方法名，排除特殊符号
      */
     public String generateMethodName(String name) {
@@ -1122,22 +1145,32 @@ public class CodeGenerationService {
     /**
      * 生成详细的参数日志
      */
-    private void generateDetailedParameterLog(MethodSpec.Builder methodBuilder, ApiEndpoint endpoint, List<String> pathVariables, String httpMethod) {
+    private void generateDetailedParameterLog(MethodSpec.Builder methodBuilder, ApiEndpoint endpoint, ParameterInfo parameterInfo) {
+        String httpMethod = endpoint.getMethod().name().toLowerCase();
+        
         // 基础日志信息 - 使用英文避免编码问题
         methodBuilder.addStatement("logger.info($S)", 
             "Received request - Method: " + httpMethod.toUpperCase() + 
             ", Path: " + endpoint.getPath());
         
         // 打印路径变量
-        if (!pathVariables.isEmpty()) {
-            for (String pathVar : pathVariables) {
+        if (!parameterInfo.getPathVariables().isEmpty()) {
+            for (ParameterInfo.Parameter param : parameterInfo.getPathVariables()) {
                 methodBuilder.addStatement("logger.info($S + $L)", 
-                    "Path variable " + pathVar + ": ", pathVar);
+                    "Path variable " + param.getName() + ": ", param.getName());
+            }
+        }
+        
+        // 打印查询参数
+        if (!parameterInfo.getQueryParameters().isEmpty()) {
+            for (ParameterInfo.Parameter param : parameterInfo.getQueryParameters()) {
+                methodBuilder.addStatement("logger.info($S + $L)", 
+                    "Query parameter " + param.getName() + ": ", param.getName());
             }
         }
         
         // 打印请求体参数
-        if ("post".equals(httpMethod) || "put".equals(httpMethod) || "patch".equals(httpMethod)) {
+        if (parameterInfo.getRequestBody() != null && !parameterInfo.getRequestBody().getProperties().isEmpty()) {
             methodBuilder.addStatement("logger.info($S + $L)", "Request body: ", "request");
             
             // 使用try-catch包装JSON序列化，避免编译错误
@@ -1153,16 +1186,158 @@ public class CodeGenerationService {
                 .build();
             methodBuilder.addCode(jsonLogBlock);
         }
+    }
+    
+    /**
+     * 解析参数信息
+     */
+    private ParameterInfo parseParameters(ApiEndpoint endpoint) {
+        ParameterInfo parameterInfo = new ParameterInfo();
+        parameterInfo.setPathVariables(new ArrayList<>());
+        parameterInfo.setQueryParameters(new ArrayList<>());
         
-        // 打印查询参数
-        if ("get".equals(httpMethod) && endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
-            List<String> queryParams = parseQueryParameters(endpoint.getRequestSchema());
-            if (!queryParams.isEmpty()) {
-                for (String param : queryParams) {
-                    methodBuilder.addStatement("logger.info($S + $L)", 
-                        "Query parameter " + param + ": ", param);
+        // 如果endpoint有parameters字段，优先使用
+        if (endpoint.getParameters() != null && !endpoint.getParameters().isEmpty()) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode rootNode = mapper.readTree(endpoint.getParameters());
+                
+                // 解析pathVariables
+                if (rootNode.has("pathVariables") && rootNode.get("pathVariables").isArray()) {
+                    JsonNode pathVarsNode = rootNode.get("pathVariables");
+                    for (JsonNode paramNode : pathVarsNode) {
+                        ParameterInfo.Parameter param = new ParameterInfo.Parameter(
+                            paramNode.get("name").asText(),
+                            paramNode.get("type").asText(),
+                            paramNode.get("required").asBoolean(),
+                            paramNode.has("description") ? paramNode.get("description").asText() : ""
+                        );
+                        parameterInfo.getPathVariables().add(param);
+                    }
                 }
+                
+                // 解析queryParameters
+                if (rootNode.has("queryParameters") && rootNode.get("queryParameters").isArray()) {
+                    JsonNode queryParamsNode = rootNode.get("queryParameters");
+                    for (JsonNode paramNode : queryParamsNode) {
+                        ParameterInfo.Parameter param = new ParameterInfo.Parameter(
+                            paramNode.get("name").asText(),
+                            paramNode.get("type").asText(),
+                            paramNode.get("required").asBoolean(),
+                            paramNode.has("description") ? paramNode.get("description").asText() : ""
+                        );
+                        parameterInfo.getQueryParameters().add(param);
+                    }
+                }
+                
+                // 解析requestBody
+                if (rootNode.has("requestBody") && rootNode.get("requestBody").isObject()) {
+                    JsonNode requestBodyNode = rootNode.get("requestBody");
+                    if (requestBodyNode.has("properties") && requestBodyNode.get("properties").isObject()) {
+                        Map<String, ParameterInfo.Property> properties = new HashMap<>();
+                        JsonNode propertiesNode = requestBodyNode.get("properties");
+                        Iterator<Map.Entry<String, JsonNode>> fields = propertiesNode.fields();
+                        
+                        while (fields.hasNext()) {
+                            Map.Entry<String, JsonNode> field = fields.next();
+                            String fieldName = field.getKey();
+                            JsonNode fieldNode = field.getValue();
+                            
+                            ParameterInfo.Property property = new ParameterInfo.Property(
+                                fieldNode.get("type").asText(),
+                                fieldNode.get("required").asBoolean(),
+                                fieldNode.has("description") ? fieldNode.get("description").asText() : ""
+                            );
+                            properties.put(fieldName, property);
+                        }
+                        
+                        ParameterInfo.RequestBody requestBody = new ParameterInfo.RequestBody(
+                            requestBodyNode.get("type").asText(),
+                            properties
+                        );
+                        parameterInfo.setRequestBody(requestBody);
+                    }
+                }
+                
+                return parameterInfo;
+            } catch (Exception e) {
+                // 如果解析失败，回退到旧的方式
+                System.err.println("解析参数信息失败，使用默认方式: " + e.getMessage());
             }
         }
+        
+        // 回退到旧的方式：从路径中提取pathVariables，从requestSchema中提取其他参数
+        String path = endpoint.getPath();
+        List<String> pathVars = extractPathVariables(path);
+        for (String pathVar : pathVars) {
+            ParameterInfo.Parameter param = new ParameterInfo.Parameter(pathVar, "string", true, "");
+            parameterInfo.getPathVariables().add(param);
+        }
+        
+        // 根据HTTP方法处理其他参数
+        String httpMethod = endpoint.getMethod().name().toLowerCase();
+        if ("get".equals(httpMethod) && endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
+            List<String> queryParams = parseQueryParameters(endpoint.getRequestSchema());
+            for (String param : queryParams) {
+                ParameterInfo.Parameter queryParam = new ParameterInfo.Parameter(param, "string", false, "");
+                parameterInfo.getQueryParameters().add(queryParam);
+            }
+        } else if (("post".equals(httpMethod) || "put".equals(httpMethod) || "patch".equals(httpMethod)) 
+                   && endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
+            // 创建requestBody
+            Map<String, ParameterInfo.Property> properties = new HashMap<>();
+            List<FieldSpec> fields = parseSchemaFields(endpoint.getRequestSchema());
+            for (FieldSpec field : fields) {
+                ParameterInfo.Property property = new ParameterInfo.Property(
+                    getFieldTypeString(field.type),
+                    field.annotations.stream().anyMatch(ann -> ann.type.toString().contains("NotNull")),
+                    ""
+                );
+                properties.put(field.name, property);
+            }
+            
+            if (!properties.isEmpty()) {
+                ParameterInfo.RequestBody requestBody = new ParameterInfo.RequestBody("object", properties);
+                parameterInfo.setRequestBody(requestBody);
+            }
+        }
+        
+        return parameterInfo;
+    }
+    
+    /**
+     * 获取参数类型对应的ClassName
+     */
+    private ClassName getParameterType(String type) {
+        switch (type.toLowerCase()) {
+            case "integer":
+            case "int":
+                return ClassName.get(Integer.class);
+            case "long":
+                return ClassName.get(Long.class);
+            case "double":
+                return ClassName.get(Double.class);
+            case "float":
+                return ClassName.get(Float.class);
+            case "boolean":
+                return ClassName.get(Boolean.class);
+            case "string":
+            default:
+                return ClassName.get(String.class);
+        }
+    }
+    
+    /**
+     * 获取字段类型字符串
+     */
+    private String getFieldTypeString(TypeName typeName) {
+        String typeString = typeName.toString();
+        if (typeString.contains("String")) return "string";
+        if (typeString.contains("Integer") || typeString.contains("int")) return "integer";
+        if (typeString.contains("Long") || typeString.contains("long")) return "long";
+        if (typeString.contains("Double") || typeString.contains("double")) return "double";
+        if (typeString.contains("Float") || typeString.contains("float")) return "float";
+        if (typeString.contains("Boolean") || typeString.contains("boolean")) return "boolean";
+        return "string";
     }
 } 

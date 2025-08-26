@@ -164,7 +164,9 @@
             
             <div th:if="${!#lists.isEmpty(services)}" class="row g-4">
                 <div th:each="service : ${services}" class="col-md-6 col-lg-4">
-                    <div class="card service-card h-100">
+                    <div class="card service-card h-100" 
+                         th:data-service-id="${service.id}"
+                         style="cursor: pointer;">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-3">
                                 <h5 class="card-title mb-0" th:text="${service.name}">服务名称</h5>
@@ -185,7 +187,7 @@
                                     <div class="fw-bold" th:text="${#temporals.format(service.createdAt, 'MM-dd HH:mm')}">12-01 10:30</div>
                                 </div>
                             </div>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2" onclick="event.stopPropagation();">
                                 <a th:href="@{'/service/' + ${service.id}}" class="btn btn-outline-primary btn-sm flex-fill">
                                     <i class="fas fa-eye me-1"></i>查看详情
                                 </a>
@@ -232,6 +234,66 @@
 
     <script src="/js/bootstrap.bundle.min.js"></script>
     <script>
+        // 页面加载完成后初始化按钮状态
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeServiceCards();
+        });
+        
+        // 初始化服务卡片按钮状态
+        function initializeServiceCards() {
+            const serviceCards = document.querySelectorAll('.service-card');
+            serviceCards.forEach(card => {
+                const statusBadge = card.querySelector('.status-badge');
+                const buttonContainer = card.querySelector('.d-flex.gap-2');
+                
+                if (statusBadge && buttonContainer) {
+                    const status = statusBadge.textContent.trim();
+                    const serviceId = card.querySelector('button[data-service-id]')?.getAttribute('data-service-id');
+                    
+                    if (serviceId) {
+                        // 移除现有的启动和停止按钮
+                        const startStopButtons = buttonContainer.querySelectorAll('button[data-service-id]');
+                        startStopButtons.forEach(button => {
+                            const onclickStr = button.onclick ? button.onclick.toString() : '';
+                            if (onclickStr.includes('startService') || onclickStr.includes('stopService')) {
+                                button.remove();
+                            }
+                        });
+                        
+                        // 根据当前状态创建正确的按钮
+                        if (status === 'RUNNING') {
+                            // 创建停止按钮
+                            const stopButton = document.createElement('button');
+                            stopButton.className = 'btn btn-outline-warning btn-sm';
+                            stopButton.setAttribute('data-service-id', serviceId);
+                            stopButton.onclick = function() { stopService(this.getAttribute('data-service-id')); };
+                            stopButton.innerHTML = '<i class="fas fa-stop me-1"></i>停止';
+                            buttonContainer.appendChild(stopButton);
+                        } else {
+                            // 创建启动按钮
+                            const startButton = document.createElement('button');
+                            startButton.className = 'btn btn-outline-success btn-sm';
+                            startButton.setAttribute('data-service-id', serviceId);
+                            startButton.onclick = function() { startService(this.getAttribute('data-service-id')); };
+                            startButton.innerHTML = '<i class="fas fa-play me-1"></i>启动';
+                            buttonContainer.appendChild(startButton);
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 为服务卡片添加点击事件
+        document.addEventListener('click', function(e) {
+            const serviceCard = e.target.closest('.service-card');
+            if (serviceCard && !e.target.closest('.d-flex.gap-2')) {
+                const serviceId = serviceCard.getAttribute('data-service-id');
+                if (serviceId) {
+                    window.location.href = `/service/${serviceId}`;
+                }
+            }
+        });
+        
         // Toast通知函数
         function showToast(type, title, message) {
             const toast = document.getElementById('toast');
@@ -367,10 +429,10 @@
             const buttonContainer = serviceCard.querySelector('.d-flex.gap-2');
             if (buttonContainer) {
                 // 移除现有的启动和停止按钮
-                const existingButtons = buttonContainer.querySelectorAll('button[data-service-id]');
-                existingButtons.forEach(button => {
-                    if (button.onclick && (button.onclick.toString().includes('startService') || 
-                                          button.onclick.toString().includes('stopService'))) {
+                const startStopButtons = buttonContainer.querySelectorAll('button[data-service-id]');
+                startStopButtons.forEach(button => {
+                    const onclickStr = button.onclick ? button.onclick.toString() : '';
+                    if (onclickStr.includes('startService') || onclickStr.includes('stopService')) {
                         button.remove();
                     }
                 });

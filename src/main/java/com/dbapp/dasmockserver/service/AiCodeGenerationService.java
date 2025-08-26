@@ -84,11 +84,32 @@ public class AiCodeGenerationService {
                     "path": "/api/endpoint",
                     "method": "GET|POST|PUT|DELETE|PATCH",
                     "description": "端点描述",
-                    "requestSchema": {
-                        "fieldName": {
-                            "type": "string|integer|boolean|array|object",
-                            "required": true|false,
-                            "description": "字段描述"
+                    "parameters": {
+                        "pathVariables": [
+                            {
+                                "name": "参数名",
+                                "type": "string|integer|boolean",
+                                "required": true|false,
+                                "description": "参数描述"
+                            }
+                        ],
+                        "queryParameters": [
+                            {
+                                "name": "参数名",
+                                "type": "string|integer|boolean",
+                                "required": true|false,
+                                "description": "参数描述"
+                            }
+                        ],
+                        "requestBody": {
+                            "type": "object",
+                            "properties": {
+                                "fieldName": {
+                                    "type": "string|integer|boolean|array|object",
+                                    "required": true|false,
+                                    "description": "字段描述"
+                                }
+                            }
                         }
                     },
                     "responseSchema": {
@@ -102,7 +123,7 @@ public class AiCodeGenerationService {
             
             特别注意：
             1. 如果文档中包含表格数据（以"=== 表格数据 ==="开头），请从表格中提取字段信息
-            2. 表格中的"字段名称"、"字段编码"、"字段类型"、"是否必输"等信息用于生成requestSchema
+            2. 表格中的"字段名称"、"字段编码"、"字段类型"、"是否必输"等信息用于生成参数信息
             3. 优先使用表格中的"字段编码"作为参数名
             4. 根据"字段类型"确定参数的数据类型：
                - VARCHAR2 -> string
@@ -113,17 +134,26 @@ public class AiCodeGenerationService {
                - BOOLEAN -> boolean
             5. 根据"是否必输"确定参数是否必需（Y=必需，N=可选）
             6. 忽略字典表（以"字典"开头的表格）
-            7. 从URL中提取接口路径
+            7. 从URL中提取接口路径，识别路径中的{param}格式作为pathVariables
             8. 从请求方法中提取HTTP方法
-            9. 如果文档中有请求示例，请参考示例中的字段名和类型
+            9. 根据HTTP方法确定参数类型：
+               - GET: 通常使用queryParameters，如果有复杂对象则使用requestBody
+               - POST/PUT/PATCH: 通常使用requestBody，简单参数可能使用queryParameters
+               - DELETE: 通常使用pathVariables或queryParameters
+            10. 如果文档中有请求示例，请参考示例中的字段名和类型
+            11. 如果URL中包含{param}格式，这些参数应该放在pathVariables中
+            12. 如果文档中明确提到查询参数，应该放在queryParameters中
+            13. 如果文档中明确提到请求体，应该放在requestBody中
             
             请确保：
             1. 准确识别HTTP方法和路径
-            2. 从表格数据中正确提取所有字段信息
-            3. 生成合理的JSON Schema，每个字段都要有type和required属性
-            4. 只返回JSON格式，不要其他解释文字
-            5. 确保requestSchema包含从表格中提取的所有字段
-            6. 字段名使用驼峰命名法
+            2. 正确识别参数类型（pathVariables、queryParameters、requestBody）
+            3. 从表格数据中正确提取所有字段信息
+            4. 生成合理的参数结构，每个参数都要有type和required属性
+            5. 只返回JSON格式，不要其他解释文字
+            6. 确保参数信息包含从表格中提取的所有字段
+            7. 字段名使用驼峰命名法
+            8. 根据HTTP方法和文档内容合理分配参数类型
             """, documentContent);
     }
     
@@ -267,10 +297,21 @@ public class AiCodeGenerationService {
                 String methodStr = getStringValue(endpointNode, "method", "GET");
                 endpoint.setMethod(parseHttpMethod(methodStr));
                 
-                // 解析请求Schema
-                JsonNode requestSchema = endpointNode.get("requestSchema");
-                if (requestSchema != null) {
-                    endpoint.setRequestSchema(requestSchema.toString());
+                // 解析参数信息（新格式）
+                JsonNode parameters = endpointNode.get("parameters");
+                if (parameters != null) {
+                    endpoint.setParameters(parameters.toString());
+                    
+                    // 为了向后兼容，也设置requestSchema
+                    if (parameters.has("requestBody") && parameters.get("requestBody").has("properties")) {
+                        endpoint.setRequestSchema(parameters.get("requestBody").toString());
+                    }
+                } else {
+                    // 兼容旧格式：解析requestSchema
+                    JsonNode requestSchema = endpointNode.get("requestSchema");
+                    if (requestSchema != null) {
+                        endpoint.setRequestSchema(requestSchema.toString());
+                    }
                 }
                 
                 // 解析响应Schema

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 class CodeGenerationServiceTest {
 
@@ -256,5 +258,45 @@ class CodeGenerationServiceTest {
         assertTrue(queryParams.contains("name"));
         assertTrue(queryParams.contains("age"));
         assertTrue(queryParams.contains("email"));
+    }
+
+    @Test
+    void testGenerateUniqueMethodName() {
+        Set<String> usedMethodNames = new HashSet<>();
+        
+        // 测试相同路径生成不同的方法名
+        String methodName1 = service.generateUniqueMethodName("/api/user/list", usedMethodNames);
+        String methodName2 = service.generateUniqueMethodName("/api/user/list", usedMethodNames);
+        String methodName3 = service.generateUniqueMethodName("/api/user/list", usedMethodNames);
+        
+        assertEquals("userList", methodName1);
+        assertEquals("userList1", methodName2);
+        assertEquals("userList2", methodName3);
+        
+        // 验证所有方法名都是唯一的
+        assertEquals(3, usedMethodNames.size());
+        assertTrue(usedMethodNames.contains("userList"));
+        assertTrue(usedMethodNames.contains("userList1"));
+        assertTrue(usedMethodNames.contains("userList2"));
+    }
+    
+    @Test
+    void testGenerateUniqueMethodNameWithDifferentPaths() {
+        Set<String> usedMethodNames = new HashSet<>();
+        
+        // 测试不同路径生成不同的方法名
+        String methodName1 = service.generateUniqueMethodName("/api/user/list", usedMethodNames);
+        String methodName2 = service.generateUniqueMethodName("/api/user/detail", usedMethodNames);
+        String methodName3 = service.generateUniqueMethodName("/api/user/create", usedMethodNames);
+        
+        assertEquals("userList", methodName1);
+        assertEquals("userDetail", methodName2);
+        assertEquals("userCreate", methodName3);
+        
+        // 验证所有方法名都是唯一的
+        assertEquals(3, usedMethodNames.size());
+        assertTrue(usedMethodNames.contains("userList"));
+        assertTrue(usedMethodNames.contains("userDetail"));
+        assertTrue(usedMethodNames.contains("userCreate"));
     }
 } 

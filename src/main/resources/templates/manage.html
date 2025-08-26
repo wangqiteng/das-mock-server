@@ -87,6 +87,19 @@
             width: 100%;
             justify-content: flex-start;
         }
+        
+        /* 服务行悬停效果 */
+        .service-row {
+            transition: background-color 0.2s ease;
+        }
+        
+        .service-row:hover {
+            background-color: #f8f9fa !important;
+        }
+        
+        .service-row:hover td {
+            background-color: #f8f9fa !important;
+        }
     </style>
 </head>
 <body>
@@ -193,7 +206,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="service : ${services}">
+                        <tr th:each="service : ${services}" 
+                            th:data-service-id="${service.id}"
+                            class="service-row"
+                            style="cursor: pointer;">
                             <td>
                                 <div class="d-flex align-items-center">
                                     <i class="fas fa-server text-primary me-2"></i>
@@ -220,30 +236,32 @@
                                 <small th:text="${#temporals.format(service.updatedAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 10:00</small>
                             </td>
                             <td>
-                                <div class="action-buttons">
+                                <div class="action-buttons" onclick="event.stopPropagation();">
                                     <a th:href="@{'/service/' + ${service.id}}" class="btn btn-sm btn-outline-primary me-1">
                                         <i class="fas fa-eye"></i>
                                     </a>
                                     <button th:if="${service.status == 'RUNNING'}" 
                                             th:data-service-id="${service.id}"
-                                            onclick="stopService(this.getAttribute('data-service-id'))" 
-                                            class="btn btn-sm btn-outline-warning me-1">
+                                            data-action="stop"
+                                            class="btn btn-sm btn-outline-warning me-1 action-btn"
+                                            th:onclick="'stopService(' + ${service.id} + ')'">
                                         <i class="fas fa-stop"></i>
                                     </button>
                                     <button th:if="${service.status != 'RUNNING'}" 
                                             th:data-service-id="${service.id}"
-                                            onclick="startService(this.getAttribute('data-service-id'))" 
-                                            class="btn btn-sm btn-outline-success me-1">
+                                            data-action="start"
+                                            class="btn btn-sm btn-outline-success me-1 action-btn"
+                                            th:onclick="'startService(' + ${service.id} + ')'">
                                         <i class="fas fa-play"></i>
                                     </button>
                                     <button th:data-service-id="${service.id}"
-                                            onclick="regenerateService(this.getAttribute('data-service-id'))" 
-                                            class="btn btn-sm btn-outline-info me-1">
+                                            data-action="regenerate"
+                                            class="btn btn-sm btn-outline-info me-1 action-btn">
                                         <i class="fas fa-sync"></i>
                                     </button>
                                     <button th:data-service-id="${service.id}"
-                                            onclick="deleteService(this.getAttribute('data-service-id'))" 
-                                            class="btn btn-sm btn-outline-danger">
+                                            data-action="delete"
+                                            class="btn btn-sm btn-outline-danger action-btn">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
@@ -304,6 +322,145 @@
 
     <script src="/js/bootstrap.bundle.min.js"></script>
     <script>
+        // 页面加载完成后初始化统计信息和按钮状态
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStats();
+            initializeEventListeners();
+            checkServiceStatuses();
+        });
+        
+        // 初始化服务按钮状态
+        function initializeServiceButtons() {
+            const services = document.querySelectorAll('tbody tr');
+            services.forEach(row => {
+                const statusBadge = row.querySelector('.status-badge');
+                const actionButtons = row.querySelector('.action-buttons');
+                
+                if (statusBadge && actionButtons) {
+                    const status = statusBadge.textContent.trim();
+                    const serviceId = row.querySelector('button[data-service-id]')?.getAttribute('data-service-id');
+                    
+                    if (serviceId) {
+                        // 检查是否已经有正确的按钮
+                        const existingStartButton = actionButtons.querySelector('button[data-action="start"]');
+                        const existingStopButton = actionButtons.querySelector('button[data-action="stop"]');
+                        
+                        // 只有在按钮状态不匹配时才更新
+                        if (status === 'RUNNING' && !existingStopButton) {
+                            // 移除启动按钮（如果存在）
+                            if (existingStartButton) {
+                                existingStartButton.remove();
+                            }
+                            
+                            // 创建停止按钮
+                            const stopButton = document.createElement('button');
+                            stopButton.className = 'btn btn-sm btn-outline-warning me-1 action-btn';
+                            stopButton.setAttribute('data-service-id', serviceId);
+                            stopButton.setAttribute('data-action', 'stop');
+                            stopButton.onclick = function() { stopService(serviceId); };
+                            stopButton.innerHTML = '<i class="fas fa-stop"></i>';
+                            
+                            // 插入到查看详情按钮之后
+                            const viewButton = actionButtons.querySelector('a[href*="/service/"]');
+                            if (viewButton) {
+                                viewButton.parentNode.insertBefore(stopButton, viewButton.nextSibling);
+                            } else {
+                                actionButtons.insertBefore(stopButton, actionButtons.firstChild);
+                            }
+                        } else if (status !== 'RUNNING' && !existingStartButton) {
+                            // 移除停止按钮（如果存在）
+                            if (existingStopButton) {
+                                existingStopButton.remove();
+                            }
+                            
+                            // 创建启动按钮
+                            const startButton = document.createElement('button');
+                            startButton.className = 'btn btn-sm btn-outline-success me-1 action-btn';
+                            startButton.setAttribute('data-service-id', serviceId);
+                            startButton.setAttribute('data-action', 'start');
+                            startButton.onclick = function() { startService(serviceId); };
+                            startButton.innerHTML = '<i class="fas fa-play"></i>';
+                            
+                            // 插入到查看详情按钮之后
+                            const viewButton = actionButtons.querySelector('a[href*="/service/"]');
+                            if (viewButton) {
+                                viewButton.parentNode.insertBefore(startButton, viewButton.nextSibling);
+                            } else {
+                                actionButtons.insertBefore(startButton, actionButtons.firstChild);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 初始化事件监听器
+        function initializeEventListeners() {
+            // 为服务行添加点击事件
+            document.addEventListener('click', function(e) {
+                const serviceRow = e.target.closest('.service-row');
+                if (serviceRow && !e.target.closest('.action-buttons')) {
+                    const serviceId = serviceRow.getAttribute('data-service-id');
+                    if (serviceId) {
+                        window.location.href = `/service/${serviceId}`;
+                    }
+                }
+            });
+            
+            // 为所有操作按钮添加点击事件
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.action-btn')) {
+                    const button = e.target.closest('.action-btn');
+                    const serviceId = button.getAttribute('data-service-id');
+                    const action = button.getAttribute('data-action');
+                    
+                    switch(action) {
+                        case 'start':
+                            startService(serviceId);
+                            break;
+                        case 'stop':
+                            stopService(serviceId);
+                            break;
+                        case 'regenerate':
+                            showConfirmDialog('fas fa-sync', '重新生成服务', 
+                                '确定要重新生成这个Mock服务吗？这将覆盖现有的代码。', 
+                                () => regenerateService(serviceId));
+                            break;
+                        case 'delete':
+                            showConfirmDialog('fas fa-trash', '删除服务', 
+                                '确定要删除这个Mock服务吗？此操作不可恢复。', 
+                                () => deleteService(serviceId));
+                            break;
+                    }
+                }
+            });
+        }
+        
+        // 检查服务状态
+        function checkServiceStatuses() {
+            const services = document.querySelectorAll('tbody tr');
+            services.forEach(row => {
+                const serviceId = row.querySelector('button[data-service-id]')?.getAttribute('data-service-id');
+                if (serviceId) {
+                    checkServiceStatus(serviceId);
+                }
+            });
+        }
+        
+        // 检查单个服务状态
+        function checkServiceStatus(serviceId) {
+            fetch(`/api/mock-server/services/${serviceId}/status`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateServiceStatus(serviceId, data.status);
+                    }
+                })
+                .catch(error => {
+                    console.error('检查服务状态失败:', error);
+                });
+        }
+        
         // 确认对话框函数
         function showConfirmDialog(icon, title, message, onConfirm) {
             const modal = document.getElementById('confirmModal');
@@ -376,7 +533,7 @@
         
         function startService(serviceId) {
             // 显示加载状态
-            const startButton = document.querySelector(`button[data-service-id="${serviceId}"][onclick*="startService"]`);
+            const startButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="start"]`);
             if (startButton) {
                 const originalText = startButton.innerHTML;
                 startButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -407,7 +564,7 @@
         
         function stopService(serviceId) {
             // 显示加载状态
-            const stopButton = document.querySelector(`button[data-service-id="${serviceId}"][onclick*="stopService"]`);
+            const stopButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="stop"]`);
             if (stopButton) {
                 const originalText = stopButton.innerHTML;
                 stopButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -443,7 +600,7 @@
                 '确定要重新生成服务代码吗？这将重新生成所有API端点的代码。',
                 () => {
                     // 显示加载状态
-                    const regenerateButton = document.querySelector(`button[data-service-id="${serviceId}"][onclick*="regenerateService"]`);
+                    const regenerateButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="regenerate"]`);
                     if (regenerateButton) {
                         const originalText = regenerateButton.innerHTML;
                         regenerateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -480,7 +637,7 @@
                 '确定要删除这个服务吗？此操作不可恢复，所有相关的API端点和配置都将被永久删除！',
                 () => {
                     // 显示加载状态
-                    const deleteButton = document.querySelector(`button[data-service-id="${serviceId}"][onclick*="deleteService"]`);
+                    const deleteButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="delete"]`);
                     if (deleteButton) {
                         const originalText = deleteButton.innerHTML;
                         deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
@@ -543,21 +700,19 @@
             const actionButtons = tableRow.querySelector('.action-buttons');
             if (actionButtons) {
                 // 移除现有的启动和停止按钮
-                const existingButtons = actionButtons.querySelectorAll('button[data-service-id]');
-                existingButtons.forEach(button => {
-                    if (button.onclick && (button.onclick.toString().includes('startService') || 
-                                          button.onclick.toString().includes('stopService'))) {
-                        button.remove();
-                    }
+                const startStopButtons = actionButtons.querySelectorAll('button[data-action="start"], button[data-action="stop"]');
+                startStopButtons.forEach(button => {
+                    button.remove();
                 });
                 
                 // 创建新的按钮
                 if (newStatus === 'RUNNING') {
                     // 创建停止按钮
                     const stopButton = document.createElement('button');
-                    stopButton.className = 'btn btn-sm btn-outline-warning me-1';
+                    stopButton.className = 'btn btn-sm btn-outline-warning me-1 action-btn';
                     stopButton.setAttribute('data-service-id', serviceId);
-                    stopButton.onclick = function() { stopService(this.getAttribute('data-service-id')); };
+                    stopButton.setAttribute('data-action', 'stop');
+                    stopButton.onclick = function() { stopService(serviceId); };
                     stopButton.innerHTML = '<i class="fas fa-stop"></i>';
                     
                     // 插入到查看详情按钮之后
@@ -570,9 +725,10 @@
                 } else {
                     // 创建启动按钮
                     const startButton = document.createElement('button');
-                    startButton.className = 'btn btn-sm btn-outline-success me-1';
+                    startButton.className = 'btn btn-sm btn-outline-success me-1 action-btn';
                     startButton.setAttribute('data-service-id', serviceId);
-                    startButton.onclick = function() { startService(this.getAttribute('data-service-id')); };
+                    startButton.setAttribute('data-action', 'start');
+                    startButton.onclick = function() { startService(serviceId); };
                     startButton.innerHTML = '<i class="fas fa-play"></i>';
                     
                     // 插入到查看详情按钮之后
@@ -596,12 +752,31 @@
             let running = 0;
             let stopped = 0;
             let error = 0;
+            let created = 0;
             
             services.forEach(row => {
-                const status = row.querySelector('.status-badge').textContent;
-                if (status === 'RUNNING') running++;
-                else if (status === 'STOPPED') stopped++;
-                else if (status === 'ERROR') error++;
+                const statusBadge = row.querySelector('.status-badge');
+                if (statusBadge) {
+                    const status = statusBadge.textContent.trim();
+                    
+                    switch (status) {
+                        case 'RUNNING':
+                            running++;
+                            break;
+                        case 'STOPPED':
+                            stopped++;
+                            break;
+                        case 'ERROR':
+                            error++;
+                            break;
+                        case 'CREATED':
+                            created++;
+                            break;
+                        default:
+                            // 未知状态，不计入统计
+                            break;
+                    }
+                }
             });
             
             // 更新统计数字
