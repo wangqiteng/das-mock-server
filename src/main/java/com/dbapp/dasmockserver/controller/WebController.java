@@ -64,10 +64,17 @@ public class WebController {
      */
     @GetMapping("/endpoint/{id}/edit")
     public String editEndpoint(@PathVariable Long id, Model model) {
-        // 这里需要根据端点ID获取端点信息
-        // 为了简化，暂时返回编辑页面
-        model.addAttribute("endpointId", id);
-        return "edit-endpoint";
+        try {
+            // 根据端点ID获取端点信息
+            ApiEndpoint endpoint = mockServerService.getApiEndpointById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Endpoint not found"));
+            
+            model.addAttribute("endpoint", endpoint);
+            return "edit-endpoint";
+        } catch (Exception e) {
+            // 如果端点不存在，重定向到首页
+            return "redirect:/";
+        }
     }
     
     /**

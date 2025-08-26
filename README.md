@@ -1,12 +1,12 @@
 # Mock Server Generator
 
-基于Spring AI框架的智能Mock Server生成器，能够自动解析API文档并生成完整的Mock Server服务。
+基于Spring AI Alibaba框架的智能Mock Server生成器，能够自动解析API文档并生成完整的Mock Server服务。
 
 ## 功能特性
 
 ### 🚀 核心功能
 - **多格式文档支持**: 支持PDF、Word、Markdown、TXT等多种格式的API文档
-- **AI智能分析**: 基于Spring AI框架，智能分析文档内容并提取API接口信息
+- **AI智能分析**: 基于Spring AI Alibaba框架，智能分析文档内容并提取API接口信息
 - **自动代码生成**: 自动生成完整的Spring Boot Mock Server项目代码
 - **可视化界面**: 提供现代化的Web界面，支持拖拽上传和实时预览
 - **服务管理**: 支持服务的启动、停止、重新生成等操作
@@ -19,10 +19,10 @@
 - 文本文件 (.txt)
 
 ### 🔧 技术栈
-- **后端**: Spring Boot 3.x, Spring AI, Spring Data JPA
+- **后端**: Spring Boot 3.x, Spring AI Alibaba, Spring Data JPA
 - **前端**: Bootstrap 5, Thymeleaf, JavaScript
 - **数据库**: H2 Database (可配置为其他数据库)
-- **AI服务**: OpenAI GPT-4 (可配置其他AI服务)
+- **AI服务**: 阿里云通义千问 (可配置其他AI服务)
 - **文件处理**: Apache PDFBox, Apache POI
 
 ## 快速开始
@@ -30,7 +30,7 @@
 ### 环境要求
 - Java 17+
 - Maven 3.6+
-- OpenAI API Key (可选，用于AI功能)
+- 阿里云通义千问API Key (可选，用于AI功能)
 
 ### 安装步骤
 
@@ -42,11 +42,8 @@ cd das-mock-server
 
 2. **配置环境变量**
 ```bash
-# 设置OpenAI API Key (可选)
-export OPENAI_API_KEY=your-openai-api-key
-
-# 设置OpenAI Base URL (可选，用于国内访问)
-export OPENAI_BASE_URL=https://api.openai.com
+# 设置阿里云通义千问API Key (可选)
+export DASHSCOPE_API_KEY=your-dashscope-api-key
 ```
 
 3. **启动应用**
@@ -153,11 +150,10 @@ spring.datasource.url=jdbc:h2:file:./data/mock-server-db
 spring.datasource.username=sa
 spring.datasource.password=password
 
-# Spring AI配置
-spring.ai.openai.api-key=${OPENAI_API_KEY:your-openai-api-key}
-spring.ai.openai.base-url=${OPENAI_BASE_URL:https://api.openai.com}
-spring.ai.openai.chat.options.model=gpt-4
-spring.ai.openai.chat.options.temperature=0.7
+# Spring AI Alibaba配置
+spring.ai.alibaba.dashscope.api-key=${DASHSCOPE_API_KEY:your-dashscope-api-key}
+spring.ai.alibaba.dashscope.chat.options.model=qwen-turbo
+spring.ai.alibaba.dashscope.chat.options.temperature=0.7
 
 # 文件上传配置
 spring.servlet.multipart.max-file-size=10MB
@@ -172,8 +168,7 @@ app.file.generated.path=./generated/
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| OPENAI_API_KEY | OpenAI API密钥 | your-openai-api-key |
-| OPENAI_BASE_URL | OpenAI API地址 | https://api.openai.com |
+| DASHSCOPE_API_KEY | 阿里云通义千问API密钥 | your-dashscope-api-key |
 
 ## 项目结构
 
@@ -241,7 +236,7 @@ docker build -t mock-server-generator .
 ```bash
 docker run -d \
   -p 8080:8080 \
-  -e OPENAI_API_KEY=your-api-key \
+  -e DASHSCOPE_API_KEY=your-api-key \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/uploads:/app/uploads \
   -v $(pwd)/generated:/app/generated \
@@ -271,7 +266,7 @@ spring.web.cors.allowed-origins=https://your-domain.com
 ## 常见问题
 
 ### Q: 如何配置其他AI服务？
-A: 修改`application.properties`中的Spring AI配置，支持Azure OpenAI、Ollama等。
+A: 修改`application.properties`中的Spring AI Alibaba配置，支持通义千问、通义万相等。
 
 ### Q: 生成的代码在哪里？
 A: 生成的代码保存在`./generated/`目录下，每个服务一个独立的项目文件夹。

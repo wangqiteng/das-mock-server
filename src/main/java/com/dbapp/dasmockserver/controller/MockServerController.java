@@ -74,14 +74,20 @@ public class MockServerController {
      * 更新API端点
      */
     @PutMapping("/endpoints/{id}")
-    public ResponseEntity<ApiEndpoint> updateEndpoint(
+    public ResponseEntity<Map<String, Object>> updateEndpoint(
             @PathVariable Long id,
             @RequestBody ApiEndpoint updatedEndpoint) {
         try {
-            ApiEndpoint endpoint = mockServerService.updateEndpoint(id, updatedEndpoint);
-            return ResponseEntity.ok(endpoint);
+            ApiEndpoint endpoint = mockServerService.updateApiEndpoint(id, updatedEndpoint);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "endpoint", endpoint,
+                "mockServiceId", endpoint.getMockService().getId()
+            ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
     

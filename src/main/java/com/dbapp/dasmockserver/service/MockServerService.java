@@ -283,6 +283,32 @@ public class MockServerService {
     }
     
     /**
+     * 根据ID获取API端点
+     */
+    public Optional<ApiEndpoint> getApiEndpointById(Long id) {
+        return apiEndpointRepository.findById(id);
+    }
+    
+    /**
+     * 更新API端点
+     */
+    public ApiEndpoint updateApiEndpoint(Long id, ApiEndpoint updatedEndpoint) {
+        Optional<ApiEndpoint> optional = apiEndpointRepository.findById(id);
+        if (optional.isPresent()) {
+            ApiEndpoint endpoint = optional.get();
+            endpoint.setName(updatedEndpoint.getName());
+            endpoint.setPath(updatedEndpoint.getPath());
+            endpoint.setMethod(updatedEndpoint.getMethod());
+            endpoint.setDescription(updatedEndpoint.getDescription());
+            endpoint.setStatusCode(updatedEndpoint.getStatusCode());
+            endpoint.setResponseDelay(updatedEndpoint.getResponseDelay());
+            endpoint.setMockResponse(updatedEndpoint.getMockResponse());
+            return apiEndpointRepository.save(endpoint);
+        }
+        throw new IllegalArgumentException("Endpoint not found with id: " + id);
+    }
+    
+    /**
      * 获取文件扩展名
      */
     private String getFileExtension(String fileName) {

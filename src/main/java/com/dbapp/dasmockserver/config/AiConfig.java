@@ -15,7 +15,7 @@ public class AiConfig {
         return chatClientBuilder
                 .defaultSystem(DEFAULT_PROMPT)
                 // 实现 Chat Memory 的 Advisor
-                // 在使用 Chat Memory 时，需要指定对话 ID，以便 Spring AI 处理上下文。
+                // 在使用 Chat Memory 时，需要指定对话 ID，以便 Spring AI Alibaba 处理上下文。
 //                .defaultAdvisors(
 //                        new MessageChatMemoryAdvisor(new InMemoryChatMemory())
 //                )
