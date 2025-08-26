@@ -84,19 +84,46 @@ public class AiCodeGenerationService {
                     "path": "/api/endpoint",
                     "method": "GET|POST|PUT|DELETE|PATCH",
                     "description": "端点描述",
-                    "requestSchema": "请求参数JSON Schema",
-                    "responseSchema": "响应参数JSON Schema"
+                    "requestSchema": {
+                        "fieldName": {
+                            "type": "string|integer|boolean|array|object",
+                            "required": true|false,
+                            "description": "字段描述"
+                        }
+                    },
+                    "responseSchema": {
+                        // 响应参数JSON Schema
+                    }
                 }
             ]
             
             文档内容：
             %s
             
+            特别注意：
+            1. 如果文档中包含表格数据（以"=== 表格数据 ==="开头），请从表格中提取字段信息
+            2. 表格中的"字段名称"、"字段编码"、"字段类型"、"是否必输"等信息用于生成requestSchema
+            3. 优先使用表格中的"字段编码"作为参数名
+            4. 根据"字段类型"确定参数的数据类型：
+               - VARCHAR2 -> string
+               - INT -> integer
+               - DATE -> string (ISO格式)
+               - CHAR -> string
+               - NUMBER -> integer
+               - BOOLEAN -> boolean
+            5. 根据"是否必输"确定参数是否必需（Y=必需，N=可选）
+            6. 忽略字典表（以"字典"开头的表格）
+            7. 从URL中提取接口路径
+            8. 从请求方法中提取HTTP方法
+            9. 如果文档中有请求示例，请参考示例中的字段名和类型
+            
             请确保：
             1. 准确识别HTTP方法和路径
-            2. 提取请求和响应的参数结构
-            3. 生成合理的JSON Schema
+            2. 从表格数据中正确提取所有字段信息
+            3. 生成合理的JSON Schema，每个字段都要有type和required属性
             4. 只返回JSON格式，不要其他解释文字
+            5. 确保requestSchema包含从表格中提取的所有字段
+            6. 字段名使用驼峰命名法
             """, documentContent);
     }
     
@@ -199,7 +226,12 @@ public class AiCodeGenerationService {
             1. 数据类型正确
             2. 包含合理的示例值
             3. 数据量适中（不要太多）
-            4. 只返回JSON，不要其他文字
+            4. 只返回成功的响应结果，不要包含错误信息
+            5. 如果是POST/PUT/PATCH请求，通常返回操作成功的响应
+            6. 如果是GET请求，通常返回查询到的数据
+            7. 响应格式应该简洁明了，符合RESTful API规范
+            8. 只返回JSON，不要其他文字
+            9. 不要同时返回成功和错误的结果
             """,
             endpoint.getName(),
             endpoint.getPath(),
@@ -317,7 +349,7 @@ public class AiCodeGenerationService {
         }
         
         // 移除特殊符号，只保留字母、数字和下划线
-        String cleaned = name.replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fa5]", "");
+        String cleaned = name.replaceAll("[^a-zA-Z0-9_]", "");
         
         // 如果清理后为空，使用默认名称
         if (cleaned.trim().isEmpty()) {
@@ -509,7 +541,7 @@ public class AiCodeGenerationService {
     }
     
     /**
-     * 生成Java包名，排除特殊符号
+     * 生成Java包名，确保每个部分都符合Java命名规范
      */
     public String generatePackageName(String name) {
         if (name == null || name.trim().isEmpty()) {
@@ -527,17 +559,35 @@ public class AiCodeGenerationService {
             return "com.example";
         }
         
-        // 确保不以数字开头
-        if (Character.isDigit(cleaned.charAt(0))) {
-            cleaned = "pkg" + cleaned;
+        // 按点分割包名
+        String[] parts = cleaned.split("\\.");
+        List<String> validParts = new ArrayList<>();
+        
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                // 确保每个部分不以数字开头
+                String validPart = part;
+                if (Character.isDigit(part.charAt(0))) {
+                    validPart = "pkg" + part;
+                }
+                validParts.add(validPart.toLowerCase());
+            }
         }
+        
+        // 如果没有有效部分，使用默认包名
+        if (validParts.isEmpty()) {
+            return "com.example";
+        }
+        
+        // 重新组合包名
+        String result = String.join(".", validParts);
         
         // 限制长度
-        if (cleaned.length() > 100) {
-            cleaned = cleaned.substring(0, 100);
+        if (result.length() > 100) {
+            result = result.substring(0, 100);
         }
         
-        return cleaned.toLowerCase();
+        return result;
     }
     
     /**
@@ -599,18 +649,64 @@ public class AiCodeGenerationService {
      * 生成默认的Mock响应
      */
     private String generateDefaultMockResponse(ApiEndpoint endpoint) {
-        return String.format("""
-            {
-                "message": "这是默认的Mock响应",
-                "endpoint": "%s",
-                "method": "%s",
-                "timestamp": "%s"
-            }
-            """,
-            endpoint.getPath(),
-            endpoint.getMethod().name(),
-            java.time.LocalDateTime.now()
-        );
+        String httpMethod = endpoint.getMethod().name().toLowerCase();
+        
+        switch (httpMethod) {
+            case "post":
+            case "put":
+            case "patch":
+                return String.format("""
+                    {
+                        "code": 200,
+                        "message": "操作成功",
+                        "data": {
+                            "id": "mock-id-123",
+                            "status": "success"
+                        },
+                        "timestamp": "%s"
+                    }
+                    """,
+                    java.time.LocalDateTime.now()
+                );
+            case "get":
+                return String.format("""
+                    {
+                        "code": 200,
+                        "message": "查询成功",
+                        "data": {
+                            "items": [],
+                            "total": 0,
+                            "page": 1,
+                            "size": 10
+                        },
+                        "timestamp": "%s"
+                    }
+                    """,
+                    java.time.LocalDateTime.now()
+                );
+            case "delete":
+                return String.format("""
+                    {
+                        "code": 200,
+                        "message": "删除成功",
+                        "data": null,
+                        "timestamp": "%s"
+                    }
+                    """,
+                    java.time.LocalDateTime.now()
+                );
+            default:
+                return String.format("""
+                    {
+                        "code": 200,
+                        "message": "请求成功",
+                        "data": null,
+                        "timestamp": "%s"
+                    }
+                    """,
+                    java.time.LocalDateTime.now()
+                );
+        }
     }
     
     /**

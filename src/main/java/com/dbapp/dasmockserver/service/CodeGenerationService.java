@@ -2,9 +2,12 @@ package com.dbapp.dasmockserver.service;
 
 import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.squareup.javapoet.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import jakarta.validation.constraints.NotNull;
 
 import javax.lang.model.element.Modifier;
 import java.io.File;
@@ -13,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -79,6 +83,9 @@ public class CodeGenerationService {
                 
                 <properties>
                     <java.version>17</java.version>
+                    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                    <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
                 </properties>
                 
                 <dependencies>
@@ -157,9 +164,6 @@ public class CodeGenerationService {
         TypeSpec.Builder controllerBuilder = TypeSpec.classBuilder("MockController")
             .addModifiers(Modifier.PUBLIC)
             .addAnnotation(ClassName.get("org.springframework.web.bind.annotation", "RestController"))
-            .addAnnotation(AnnotationSpec.builder(ClassName.get("org.springframework.web.bind.annotation", "RequestMapping"))
-                .addMember("value", "$S", "/api")
-                .build())
             .addAnnotation(AnnotationSpec.builder(ClassName.get("org.springframework.web.bind.annotation", "CrossOrigin"))
                 .addMember("origins", "$S", "*")
                 .build());
@@ -201,12 +205,49 @@ public class CodeGenerationService {
             );
         }
         
-        // 添加HTTP方法注解
+        // 根据HTTP方法添加请求参数
         String httpMethod = endpoint.getMethod().name().toLowerCase();
+        if ("post".equals(httpMethod) || "put".equals(httpMethod) || "patch".equals(httpMethod)) {
+            // 添加请求体参数
+            String requestClassName = generateClassName(endpoint.getName() + "Request");
+            methodBuilder.addParameter(
+                ParameterSpec.builder(ClassName.get("com.dbapp." + sanitizeProjectName(endpoint.getMockService().getName()).toLowerCase() + ".dto", requestClassName), "request")
+                    .addAnnotation(ClassName.get("org.springframework.web.bind.annotation", "RequestBody"))
+                    .build()
+            );
+        } else if ("get".equals(httpMethod)) {
+            // 添加查询参数
+            if (endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
+                // 解析请求参数并添加为@RequestParam
+                List<String> queryParams = parseQueryParameters(endpoint.getRequestSchema());
+                for (String param : queryParams) {
+                    methodBuilder.addParameter(
+                        ParameterSpec.builder(String.class, param)
+                            .addAnnotation(AnnotationSpec.builder(
+                                ClassName.get("org.springframework.web.bind.annotation", "RequestParam"))
+                                .addMember("value", "$S", param)
+                                .addMember("required", "false")
+                                .build())
+                            .build()
+                    );
+                }
+            }
+        }
+        
+        // 添加HTTP方法注解
         methodBuilder.addAnnotation(AnnotationSpec.builder(
             ClassName.get("org.springframework.web.bind.annotation", httpMethod.substring(0, 1).toUpperCase() + httpMethod.substring(1) + "Mapping"))
             .addMember("value", "$S", path)
             .build());
+        
+        // 添加日志打印请求参数
+        methodBuilder.addStatement("$T logger = $T.getLogger($T.class)", 
+            ClassName.get("org.slf4j", "Logger"),
+            ClassName.get("org.slf4j", "LoggerFactory"),
+            ClassName.get("java.lang", "Class"));
+        
+        // 生成详细的参数日志
+        generateDetailedParameterLog(methodBuilder, endpoint, pathVariables, httpMethod);
         
         // 添加响应延迟
         if (endpoint.getResponseDelay() != null && endpoint.getResponseDelay() > 0) {
@@ -239,22 +280,15 @@ public class CodeGenerationService {
     }
     
     /**
-     * 标准化路径，移除重复的/api前缀
+     * 标准化路径，直接使用解析到的路径
      */
-    private String normalizePath(String path) {
+    public String normalizePath(String path) {
         if (path == null || path.trim().isEmpty()) {
             return "/";
         }
         
-        // 移除开头的/api前缀（如果存在）
+        // 直接使用解析到的路径，确保以/开头
         String normalized = path.trim();
-        if (normalized.startsWith("/api/")) {
-            normalized = normalized.substring(4); // 移除"/api"
-        } else if (normalized.equals("/api")) {
-            normalized = "/";
-        }
-        
-        // 确保路径以/开头
         if (!normalized.startsWith("/")) {
             normalized = "/" + normalized;
         }
@@ -265,7 +299,7 @@ public class CodeGenerationService {
     /**
      * 提取路径中的PathVariable参数
      */
-    private List<String> extractPathVariables(String path) {
+    public List<String> extractPathVariables(String path) {
         List<String> pathVariables = new ArrayList<>();
         
         if (path == null || path.trim().isEmpty()) {
@@ -296,10 +330,12 @@ public class CodeGenerationService {
         
         for (ApiEndpoint endpoint : endpoints) {
             if (endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
-                generateDtoClass(projectPath, packageName, endpoint.getName() + "Request", endpoint.getRequestSchema());
+                String requestClassName = generateClassName(endpoint.getName() + "Request");
+                generateDtoClassFromAiSchema(projectPath, packageName, requestClassName, endpoint.getRequestSchema());
             }
             if (endpoint.getResponseSchema() != null && !endpoint.getResponseSchema().isEmpty()) {
-                generateDtoClass(projectPath, packageName, endpoint.getName() + "Response", endpoint.getResponseSchema());
+                String responseClassName = generateClassName(endpoint.getName() + "Response");
+                generateDtoClass(projectPath, packageName, responseClassName, endpoint.getResponseSchema());
             }
         }
     }
@@ -308,16 +344,476 @@ public class CodeGenerationService {
      * 生成单个DTO类
      */
     private void generateDtoClass(String projectPath, String packageName, String className, String schema) throws IOException {
-        // 这里简化处理，实际应该解析JSON Schema
-        TypeSpec dtoClass = TypeSpec.classBuilder(className)
+        TypeSpec.Builder dtoClassBuilder = TypeSpec.classBuilder(className)
             .addModifiers(Modifier.PUBLIC)
             .addAnnotation(AnnotationSpec.builder(ClassName.get("com.fasterxml.jackson.annotation", "JsonIgnoreProperties"))
                 .addMember("ignoreUnknown", "$L", true)
-                .build())
-            .build();
+                .build());
         
-        JavaFile javaFile = JavaFile.builder(packageName, dtoClass).build();
+        // 解析JSON Schema并生成字段
+        List<FieldSpec> fields = parseSchemaFields(schema);
+        for (FieldSpec field : fields) {
+            dtoClassBuilder.addField(field);
+        }
+        
+        // 生成构造函数
+        dtoClassBuilder.addMethod(generateConstructor(className, fields));
+        
+        // 生成getter和setter方法
+        for (FieldSpec field : fields) {
+            dtoClassBuilder.addMethod(generateGetter(field));
+            dtoClassBuilder.addMethod(generateSetter(field));
+        }
+        
+        JavaFile javaFile = JavaFile.builder(packageName, dtoClassBuilder.build()).build();
         javaFile.writeTo(Paths.get(projectPath, "src/main/java"));
+    }
+    
+    /**
+     * 从AI解析的Schema生成DTO类
+     */
+    private void generateDtoClassFromAiSchema(String projectPath, String packageName, String className, String schema) throws IOException {
+        TypeSpec.Builder dtoClassBuilder = TypeSpec.classBuilder(className)
+            .addModifiers(Modifier.PUBLIC)
+            .addAnnotation(AnnotationSpec.builder(ClassName.get("com.fasterxml.jackson.annotation", "JsonIgnoreProperties"))
+                .addMember("ignoreUnknown", "$L", true)
+                .build());
+        
+        // 解析AI生成的Schema并生成字段
+        List<FieldSpec> fields = parseAiSchemaFields(schema);
+        for (FieldSpec field : fields) {
+            dtoClassBuilder.addField(field);
+        }
+        
+        // 生成构造函数
+        dtoClassBuilder.addMethod(generateConstructor(className, fields));
+        
+        // 生成getter和setter方法
+        for (FieldSpec field : fields) {
+            dtoClassBuilder.addMethod(generateGetter(field));
+            dtoClassBuilder.addMethod(generateSetter(field));
+        }
+        
+        JavaFile javaFile = JavaFile.builder(packageName, dtoClassBuilder.build()).build();
+        javaFile.writeTo(Paths.get(projectPath, "src/main/java"));
+    }
+    
+    /**
+     * 解析JSON Schema并生成字段
+     */
+    private List<FieldSpec> parseSchemaFields(String schema) {
+        List<FieldSpec> fields = new ArrayList<>();
+        
+        if (schema == null || schema.trim().isEmpty()) {
+            return fields;
+        }
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(schema);
+            
+            if (jsonNode.isObject()) {
+                Iterator<Map.Entry<String, JsonNode>> fieldsIterator = jsonNode.fields();
+                while (fieldsIterator.hasNext()) {
+                    Map.Entry<String, JsonNode> fieldEntry = fieldsIterator.next();
+                    String fieldName = fieldEntry.getKey();
+                    JsonNode fieldNode = fieldEntry.getValue();
+                    
+                    FieldSpec field = createFieldFromSchema(fieldName, fieldNode);
+                    if (field != null) {
+                        fields.add(field);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 如果JSON解析失败，尝试从表格数据格式解析
+            fields.addAll(parseTableDataFields(schema));
+        }
+        
+        return fields;
+    }
+    
+    /**
+     * 解析AI生成的Schema并生成字段
+     */
+    private List<FieldSpec> parseAiSchemaFields(String schema) {
+        List<FieldSpec> fields = new ArrayList<>();
+        
+        if (schema == null || schema.trim().isEmpty()) {
+            return fields;
+        }
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(schema);
+            
+            if (jsonNode.isObject()) {
+                Iterator<Map.Entry<String, JsonNode>> fieldsIterator = jsonNode.fields();
+                while (fieldsIterator.hasNext()) {
+                    Map.Entry<String, JsonNode> fieldEntry = fieldsIterator.next();
+                    String fieldName = fieldEntry.getKey();
+                    JsonNode fieldNode = fieldEntry.getValue();
+                    
+                    FieldSpec field = createFieldFromAiSchema(fieldName, fieldNode);
+                    if (field != null) {
+                        fields.add(field);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 如果解析失败，记录错误并返回空列表
+            System.err.println("解析AI Schema失败: " + e.getMessage());
+            System.err.println("Schema内容: " + schema);
+        }
+        
+        return fields;
+    }
+    
+    /**
+     * 从表格数据格式解析字段
+     */
+    private List<FieldSpec> parseTableDataFields(String schema) {
+        List<FieldSpec> fields = new ArrayList<>();
+        
+        if (schema == null || !schema.contains("===")) {
+            return fields;
+        }
+        
+        try {
+            // 提取表格数据部分
+            String tableData = extractTableData(schema);
+            if (tableData == null) {
+                return fields;
+            }
+            
+            // 解析表格行
+            String[] lines = tableData.split("\n");
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("编号") || line.startsWith("---")) {
+                    continue;
+                }
+                
+                // 解析表格行：编号 | 字段名称 | 字段编码 | 字段类型 | 是否必输 | 说明
+                String[] parts = line.split("\\|");
+                if (parts.length >= 4) {
+                    String fieldCode = parts[2].trim();
+                    String fieldType = parts[3].trim();
+                    String required = parts.length > 4 ? parts[4].trim() : "N";
+                    
+                    if (!fieldCode.isEmpty() && !fieldCode.equals("字段编码")) {
+                        FieldSpec field = createFieldFromTableData(fieldCode, fieldType, required);
+                        if (field != null) {
+                            fields.add(field);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 解析失败时返回空列表
+        }
+        
+        return fields;
+    }
+    
+    /**
+     * 提取表格数据部分
+     */
+    private String extractTableData(String schema) {
+        int startIndex = schema.indexOf("=== 表格数据 ===");
+        if (startIndex == -1) {
+            return null;
+        }
+        
+        int endIndex = schema.indexOf("=== 表格结束 ===");
+        if (endIndex == -1) {
+            endIndex = schema.length();
+        }
+        
+        return schema.substring(startIndex + "=== 表格数据 ===".length(), endIndex).trim();
+    }
+    
+    /**
+     * 从JSON Schema创建字段
+     */
+    private FieldSpec createFieldFromSchema(String fieldName, JsonNode fieldNode) {
+        // 清理字段名，确保符合Java标识符规范
+        String cleanFieldName = generateVariableName(fieldName);
+        
+        // 确定字段类型
+        TypeName fieldType = determineFieldType(fieldNode);
+        
+        // 创建字段
+        FieldSpec.Builder fieldBuilder = FieldSpec.builder(fieldType, cleanFieldName, Modifier.PRIVATE);
+        
+        // 添加Jackson注解
+        fieldBuilder.addAnnotation(AnnotationSpec.builder(ClassName.get("com.fasterxml.jackson.annotation", "JsonProperty"))
+            .addMember("value", "$S", fieldName)
+            .build());
+        
+        // 添加验证注解（如果字段是必需的）
+        if (fieldNode.has("required") && fieldNode.get("required").asBoolean()) {
+            fieldBuilder.addAnnotation(ClassName.get("jakarta.validation.constraints", "NotNull"));
+        }
+        
+        return fieldBuilder.build();
+    }
+    
+    /**
+     * 从AI Schema创建字段
+     */
+    private FieldSpec createFieldFromAiSchema(String fieldName, JsonNode fieldNode) {
+        // 清理字段名，确保符合Java标识符规范
+        String cleanFieldName = generateVariableName(fieldName);
+        
+        // 确定字段类型
+        TypeName fieldType = determineFieldTypeFromAiSchema(fieldNode);
+        
+        // 创建字段
+        FieldSpec.Builder fieldBuilder = FieldSpec.builder(fieldType, cleanFieldName, Modifier.PRIVATE);
+        
+        // 添加Jackson注解
+        fieldBuilder.addAnnotation(AnnotationSpec.builder(ClassName.get("com.fasterxml.jackson.annotation", "JsonProperty"))
+            .addMember("value", "$S", fieldName)
+            .build());
+        
+        // 添加验证注解（如果字段是必需的）
+        if (fieldNode.has("required") && fieldNode.get("required").asBoolean()) {
+            fieldBuilder.addAnnotation(ClassName.get("jakarta.validation.constraints", "NotNull"));
+        }
+        
+        return fieldBuilder.build();
+    }
+    
+    /**
+     * 从表格数据创建字段
+     */
+    private FieldSpec createFieldFromTableData(String fieldCode, String fieldType, String required) {
+        // 清理字段名，确保符合Java标识符规范
+        String cleanFieldName = generateVariableName(fieldCode);
+        
+        // 确定字段类型
+        TypeName javaType = mapTableTypeToJavaType(fieldType);
+        
+        // 创建字段
+        FieldSpec.Builder fieldBuilder = FieldSpec.builder(javaType, cleanFieldName, Modifier.PRIVATE);
+        
+        // 添加Jackson注解
+        fieldBuilder.addAnnotation(AnnotationSpec.builder(ClassName.get("com.fasterxml.jackson.annotation", "JsonProperty"))
+            .addMember("value", "$S", fieldCode)
+            .build());
+        
+        // 添加验证注解（如果字段是必需的）
+        if ("Y".equalsIgnoreCase(required)) {
+            fieldBuilder.addAnnotation(ClassName.get("jakarta.validation.constraints", "NotNull"));
+        }
+        
+        return fieldBuilder.build();
+    }
+    
+    /**
+     * 确定字段类型
+     */
+    private TypeName determineFieldType(JsonNode fieldNode) {
+        String type = fieldNode.has("type") ? fieldNode.get("type").asText() : "string";
+        
+        switch (type.toLowerCase()) {
+            case "integer":
+            case "int":
+                return TypeName.INT;
+            case "long":
+                return TypeName.LONG;
+            case "double":
+            case "float":
+                return TypeName.DOUBLE;
+            case "boolean":
+            case "bool":
+                return TypeName.BOOLEAN;
+            case "array":
+                // 处理数组类型
+                if (fieldNode.has("items")) {
+                    TypeName itemType = determineFieldType(fieldNode.get("items"));
+                    return ParameterizedTypeName.get(ClassName.get(List.class), itemType);
+                }
+                return ParameterizedTypeName.get(ClassName.get(List.class), TypeName.OBJECT);
+            case "object":
+                return TypeName.OBJECT;
+            case "string":
+            default:
+                return ClassName.get(String.class);
+        }
+    }
+    
+    /**
+     * 从AI Schema确定字段类型
+     */
+    private TypeName determineFieldTypeFromAiSchema(JsonNode fieldNode) {
+        String type = fieldNode.has("type") ? fieldNode.get("type").asText() : "string";
+        
+        switch (type.toLowerCase()) {
+            case "integer":
+            case "int":
+                return TypeName.INT;
+            case "long":
+                return TypeName.LONG;
+            case "double":
+            case "float":
+                return TypeName.DOUBLE;
+            case "boolean":
+            case "bool":
+                return TypeName.BOOLEAN;
+            case "array":
+                // 处理数组类型
+                if (fieldNode.has("items")) {
+                    TypeName itemType = determineFieldTypeFromAiSchema(fieldNode.get("items"));
+                    return ParameterizedTypeName.get(ClassName.get(List.class), itemType);
+                }
+                return ParameterizedTypeName.get(ClassName.get(List.class), TypeName.OBJECT);
+            case "object":
+                return TypeName.OBJECT;
+            case "string":
+            default:
+                return ClassName.get(String.class);
+        }
+    }
+    
+    /**
+     * 将表格类型映射到Java类型
+     */
+    private TypeName mapTableTypeToJavaType(String tableType) {
+        if (tableType == null) {
+            return ClassName.get(String.class);
+        }
+        
+        String type = tableType.toUpperCase();
+        
+        if (type.contains("VARCHAR") || type.contains("CHAR") || type.contains("TEXT")) {
+            return ClassName.get(String.class);
+        } else if (type.contains("INT") || type.contains("NUMBER")) {
+            return TypeName.INT;
+        } else if (type.contains("LONG") || type.contains("BIGINT")) {
+            return TypeName.LONG;
+        } else if (type.contains("DOUBLE") || type.contains("FLOAT") || type.contains("DECIMAL")) {
+            return TypeName.DOUBLE;
+        } else if (type.contains("BOOLEAN") || type.contains("BOOL")) {
+            return TypeName.BOOLEAN;
+        } else if (type.contains("DATE") || type.contains("TIMESTAMP")) {
+            return ClassName.get(String.class); // 使用String表示日期
+        } else {
+            return ClassName.get(String.class); // 默认使用String
+        }
+    }
+    
+    /**
+     * 生成构造函数
+     */
+    private MethodSpec generateConstructor(String className, List<FieldSpec> fields) {
+        MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder()
+            .addModifiers(Modifier.PUBLIC);
+        
+        // 添加参数
+        for (FieldSpec field : fields) {
+            constructorBuilder.addParameter(field.type, field.name);
+        }
+        
+        // 添加字段赋值
+        for (FieldSpec field : fields) {
+            constructorBuilder.addStatement("this.$L = $L", field.name, field.name);
+        }
+        
+        return constructorBuilder.build();
+    }
+    
+    /**
+     * 生成getter方法
+     */
+    private MethodSpec generateGetter(FieldSpec field) {
+        String getterName = "get" + field.name.substring(0, 1).toUpperCase() + field.name.substring(1);
+        
+        return MethodSpec.methodBuilder(getterName)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(field.type)
+            .addStatement("return this.$L", field.name)
+            .build();
+    }
+    
+    /**
+     * 生成setter方法
+     */
+    private MethodSpec generateSetter(FieldSpec field) {
+        String setterName = "set" + field.name.substring(0, 1).toUpperCase() + field.name.substring(1);
+        
+        return MethodSpec.methodBuilder(setterName)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(void.class)
+            .addParameter(field.type, field.name)
+            .addStatement("this.$L = $L", field.name, field.name)
+            .build();
+    }
+    
+    /**
+     * 生成Java变量名，排除特殊符号
+     */
+    public String generateVariableName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "defaultVariable";
+        }
+        
+        // 处理常见的命名模式
+        String processed = name;
+        
+        // 处理连字符分隔的命名（如 user-name -> userName）
+        if (processed.contains("-")) {
+            String[] parts = processed.split("-");
+            StringBuilder result = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                String part = parts[i];
+                if (i == 0) {
+                    result.append(part.toLowerCase());
+                } else {
+                    result.append(part.substring(0, 1).toUpperCase()).append(part.substring(1).toLowerCase());
+                }
+            }
+            processed = result.toString();
+        }
+        
+        // 处理下划线分隔的命名（如 user_id -> userId）
+        if (processed.contains("_")) {
+            String[] parts = processed.split("_");
+            StringBuilder result = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                String part = parts[i];
+                if (i == 0) {
+                    result.append(part.toLowerCase());
+                } else {
+                    result.append(part.substring(0, 1).toUpperCase()).append(part.substring(1).toLowerCase());
+                }
+            }
+            processed = result.toString();
+        }
+        
+        // 移除特殊符号，只保留字母、数字和下划线
+        String cleaned = processed.replaceAll("[^a-zA-Z0-9_]", "");
+        
+        // 如果清理后为空，使用默认名称
+        if (cleaned.trim().isEmpty()) {
+            return "defaultVariable";
+        }
+        
+        // 确保首字母小写（Java变量名规范）
+        String result = cleaned.substring(0, 1).toLowerCase() + cleaned.substring(1);
+        
+        // 如果以数字开头，添加前缀
+        if (Character.isDigit(result.charAt(0))) {
+            result = "var" + result;
+        }
+        
+        // 限制长度，避免过长
+        if (result.length() > 50) {
+            result = result.substring(0, 50);
+        }
+        
+        return result;
     }
     
     /**
@@ -333,9 +829,18 @@ public class CodeGenerationService {
             
             # 日志配置
             logging.level.com.dbapp=DEBUG
+            logging.pattern.console=%%d{yyyy-MM-dd HH:mm:ss.SSS} [%%thread] %%-5level %%logger{36} - %%msg%%n
+            logging.charset.console=UTF-8
+            logging.charset.file=UTF-8
             
             # Jackson配置
             spring.jackson.default-property-inclusion=non_null
+            spring.jackson.encoding=UTF-8
+            
+            # 文件编码配置
+            spring.http.encoding.charset=UTF-8
+            spring.http.encoding.enabled=true
+            spring.http.encoding.force=true
             """, 
             mockService.getPort(),
             mockService.getName()
@@ -380,10 +885,59 @@ public class CodeGenerationService {
     }
     
     /**
-     * 清理项目名称
+     * 清理项目名称，确保符合Java包名规范
      */
-    private String sanitizeProjectName(String name) {
-        return name.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+    public String sanitizeProjectName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "example";
+        }
+        
+        // 移除特殊符号，只保留字母、数字
+        String cleaned = name.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+        
+        // 如果清理后为空，使用默认名称
+        if (cleaned.trim().isEmpty()) {
+            return "example";
+        }
+        
+        // 确保不以数字开头
+        if (Character.isDigit(cleaned.charAt(0))) {
+            cleaned = "pkg" + cleaned;
+        }
+        
+        return cleaned;
+    }
+
+    /**
+     * 生成Java类名，确保符合Java命名规范
+     */
+    public String generateClassName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "DefaultClass";
+        }
+        
+        // 移除特殊符号，只保留字母、数字和下划线
+        String cleaned = name.replaceAll("[^a-zA-Z0-9_]", "");
+        
+        // 如果清理后为空，使用默认名称
+        if (cleaned.trim().isEmpty()) {
+            return "DefaultClass";
+        }
+        
+        // 确保首字母大写（Java类名规范）
+        String result = cleaned.substring(0, 1).toUpperCase() + cleaned.substring(1);
+        
+        // 如果以数字开头，添加前缀
+        if (Character.isDigit(result.charAt(0))) {
+            result = "Class" + result;
+        }
+        
+        // 限制长度，避免过长
+        if (result.length() > 50) {
+            result = result.substring(0, 50);
+        }
+        
+        return result;
     }
 
     /**
@@ -477,5 +1031,138 @@ public class CodeGenerationService {
         }
 
         return result.toString();
+    }
+    
+    /**
+     * 解析查询参数
+     */
+    public List<String> parseQueryParameters(String requestSchema) {
+        List<String> params = new ArrayList<>();
+        
+        if (requestSchema == null || requestSchema.trim().isEmpty()) {
+            return params;
+        }
+        
+        try {
+            // 尝试解析JSON格式的请求参数
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(requestSchema);
+            
+            if (jsonNode.isObject()) {
+                Iterator<String> fieldNames = jsonNode.fieldNames();
+                while (fieldNames.hasNext()) {
+                    String fieldName = fieldNames.next();
+                    // 清理参数名，确保是有效的Java标识符
+                    String cleanParamName = fieldName.replaceAll("[^a-zA-Z0-9_]", "");
+                    if (!cleanParamName.isEmpty()) {
+                        params.add(cleanParamName);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 如果JSON解析失败，尝试从文本中提取参数
+            // 简单的参数提取逻辑
+            String[] lines = requestSchema.split("\n");
+            for (String line : lines) {
+                if (line.contains(":") || line.contains("=")) {
+                    String[] parts = line.split("[:=]");
+                    if (parts.length > 0) {
+                        String paramName = parts[0].trim().replaceAll("[^a-zA-Z0-9_]", "");
+                        if (!paramName.isEmpty()) {
+                            params.add(paramName);
+                        }
+                    }
+                }
+            }
+        }
+        
+        return params;
+    }
+    
+    /**
+     * 生成参数日志字符串
+     */
+    private String generateParameterLogString(ApiEndpoint endpoint, List<String> pathVariables) {
+        StringBuilder logString = new StringBuilder();
+        
+        // 添加路径变量
+        if (!pathVariables.isEmpty()) {
+            logString.append("pathVariables={");
+            for (int i = 0; i < pathVariables.size(); i++) {
+                if (i > 0) logString.append(", ");
+                logString.append(pathVariables.get(i)).append(":").append("$").append(pathVariables.get(i));
+            }
+            logString.append("}");
+        }
+        
+        // 添加请求体参数
+        String httpMethod = endpoint.getMethod().name().toLowerCase();
+        if ("post".equals(httpMethod) || "put".equals(httpMethod) || "patch".equals(httpMethod)) {
+            if (logString.length() > 0) logString.append(", ");
+            logString.append("requestBody=$request");
+        }
+        
+        // 添加查询参数
+        if ("get".equals(httpMethod) && endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
+            List<String> queryParams = parseQueryParameters(endpoint.getRequestSchema());
+            if (!queryParams.isEmpty()) {
+                if (logString.length() > 0) logString.append(", ");
+                logString.append("queryParams={");
+                for (int i = 0; i < queryParams.size(); i++) {
+                    if (i > 0) logString.append(", ");
+                    logString.append(queryParams.get(i)).append(":").append("$").append(queryParams.get(i));
+                }
+                logString.append("}");
+            }
+        }
+        
+        return logString.toString();
+    }
+    
+    /**
+     * 生成详细的参数日志
+     */
+    private void generateDetailedParameterLog(MethodSpec.Builder methodBuilder, ApiEndpoint endpoint, List<String> pathVariables, String httpMethod) {
+        // 基础日志信息 - 使用英文避免编码问题
+        methodBuilder.addStatement("logger.info($S)", 
+            "Received request - Method: " + httpMethod.toUpperCase() + 
+            ", Path: " + endpoint.getPath());
+        
+        // 打印路径变量
+        if (!pathVariables.isEmpty()) {
+            for (String pathVar : pathVariables) {
+                methodBuilder.addStatement("logger.info($S + $L)", 
+                    "Path variable " + pathVar + ": ", pathVar);
+            }
+        }
+        
+        // 打印请求体参数
+        if ("post".equals(httpMethod) || "put".equals(httpMethod) || "patch".equals(httpMethod)) {
+            methodBuilder.addStatement("logger.info($S + $L)", "Request body: ", "request");
+            
+            // 使用try-catch包装JSON序列化，避免编译错误
+            CodeBlock jsonLogBlock = CodeBlock.builder()
+                .add("try {\n")
+                .add("  logger.info($S + new $T().writeValueAsString($L));\n", 
+                    "Request body JSON: ", 
+                    ClassName.get("com.fasterxml.jackson.databind", "ObjectMapper"),
+                    "request")
+                .add("} catch ($T e) {\n", ClassName.get("com.fasterxml.jackson.core", "JsonProcessingException"))
+                .add("  logger.warn($S + e.getMessage());\n", "Failed to serialize request body to JSON: ")
+                .add("}")
+                .build();
+            methodBuilder.addCode(jsonLogBlock);
+        }
+        
+        // 打印查询参数
+        if ("get".equals(httpMethod) && endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
+            List<String> queryParams = parseQueryParameters(endpoint.getRequestSchema());
+            if (!queryParams.isEmpty()) {
+                for (String param : queryParams) {
+                    methodBuilder.addStatement("logger.info($S + $L)", 
+                        "Query parameter " + param + ": ", param);
+                }
+            }
+        }
     }
 } 

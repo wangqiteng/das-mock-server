@@ -70,8 +70,36 @@ public class DocumentParserService {
         try (XWPFDocument document = new XWPFDocument(inputStream)) {
             StringBuilder content = new StringBuilder();
             
+            // 解析段落
             for (XWPFParagraph paragraph : document.getParagraphs()) {
                 content.append(paragraph.getText()).append("\n");
+            }
+            
+            // 解析表格
+            for (org.apache.poi.xwpf.usermodel.XWPFTable table : document.getTables()) {
+                content.append("\n=== 表格数据 ===\n");
+                for (int rowIndex = 0; rowIndex < table.getNumberOfRows(); rowIndex++) {
+                    org.apache.poi.xwpf.usermodel.XWPFTableRow row = table.getRow(rowIndex);
+                    if (row != null) {
+                        StringBuilder rowContent = new StringBuilder();
+                        for (int cellIndex = 0; cellIndex < row.getTableCells().size(); cellIndex++) {
+                            org.apache.poi.xwpf.usermodel.XWPFTableCell cell = row.getCell(cellIndex);
+                            if (cell != null) {
+                                String cellText = cell.getText().trim();
+                                if (!cellText.isEmpty()) {
+                                    rowContent.append(cellText);
+                                    if (cellIndex < row.getTableCells().size() - 1) {
+                                        rowContent.append(" | ");
+                                    }
+                                }
+                            }
+                        }
+                        if (rowContent.length() > 0) {
+                            content.append(rowContent.toString()).append("\n");
+                        }
+                    }
+                }
+                content.append("=== 表格结束 ===\n");
             }
             
             return content.toString();
@@ -86,10 +114,16 @@ public class DocumentParserService {
             StringBuilder content = new StringBuilder();
 
             Range range = document.getRange();
+            
+            // 解析段落
             for (int i = 0; i < range.numParagraphs(); i++) {
                 Paragraph paragraph = range.getParagraph(i);
                 content.append(paragraph.text()).append("\n");
             }
+            
+            // 解析表格 - 对于.doc文件，表格解析比较复杂，暂时跳过
+            // 如果需要完整的表格支持，建议使用.docx格式
+            content.append("\n=== 注意：.doc格式的表格数据暂不支持解析，建议使用.docx格式 ===\n");
 
             return content.toString();
         }
