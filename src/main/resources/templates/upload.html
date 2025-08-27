@@ -7,29 +7,20 @@
     <link href="/css/bootstrap.min.css" rel="stylesheet">
     <link href="/css/all.min.css" rel="stylesheet">
     <style>
-        .upload-area {
-            border: 2px dashed #dee2e6;
-            border-radius: 10px;
-            padding: 40px;
-            text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
+        /* 页面背景渐变 */
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
-        .upload-area:hover {
-            border-color: #007bff;
-            background-color: #f8f9fa;
-        }
-        .upload-area.dragover {
-            border-color: #007bff;
-            background-color: #e3f2fd;
-        }
-        .file-preview {
-            max-width: 100%;
-            max-height: 200px;
-            border-radius: 5px;
-        }
-        .progress-container {
-            display: none;
+        
+        /* 主容器样式 */
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 1rem auto;
+            overflow: hidden;
         }
         
         /* 固定菜单项宽度，防止位置变化 */
@@ -41,6 +32,12 @@
         .navbar-nav .nav-link {
             white-space: nowrap;
             padding: 0.5rem 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .navbar-nav .nav-link:hover {
+            transform: translateY(-1px);
+            color: #667eea !important;
         }
         
         /* 确保导航栏布局稳定 */
@@ -51,6 +48,257 @@
         .navbar-nav {
             width: 100%;
             justify-content: flex-start;
+        }
+        
+        /* 上传区域美化 */
+        .upload-area {
+            border: 3px dashed #dee2e6;
+            border-radius: 20px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(145deg, #f8f9fa, #ffffff);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: linear-gradient(145deg, #f0f4ff, #ffffff);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.2);
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: linear-gradient(145deg, #e8f2ff, #ffffff);
+            transform: scale(1.01);
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.3);
+        }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transition: left 0.8s ease;
+        }
+        
+        .upload-area:hover::before {
+            left: 100%;
+        }
+        
+        .upload-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .upload-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #333;
+        }
+        
+        .upload-description {
+            color: #666;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        
+        /* 文件预览美化 */
+        .file-preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .file-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 0.75rem;
+            margin-top: 0.75rem;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+        
+        /* 表单美化 */
+        .form-section {
+            background: white;
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            margin: 0.75rem 0;
+        }
+        
+        .form-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .form-control {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 0.6rem 0.8rem;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .form-control:focus {
+            border-color: #667eea;
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+        
+        /* 按钮美化 */
+        .btn {
+            border-radius: 12px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-outline-primary {
+            border: 2px solid #667eea;
+            color: #667eea;
+            background: transparent;
+        }
+        
+        .btn-outline-primary:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: transparent;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        /* 进度条美化 */
+        .progress-container {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+            background: white;
+            border-radius: 15px;
+            padding: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin: 1rem 0;
+        }
+        
+        .progress {
+            height: 12px;
+            border-radius: 10px;
+            background: #e9ecef;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .progress-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        /* 支持格式说明美化 */
+        .format-section {
+            background: white;
+            border-radius: 20px;
+            padding: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-top: 0.75rem;
+        }
+        
+        .format-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 0.75rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .format-card:hover {
+            background: white;
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+        }
+        
+        .format-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .format-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.25rem;
+            font-size: 0.8rem;
+        }
+        
+        .format-description {
+            color: #666;
+            font-size: 0.7rem;
+        }
+        
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 页面加载动画 - 已移除 */
+        /* .fade-in {
+            animation: fadeIn 0.8s ease-out;
+        } */
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .upload-area {
+                padding: 1.5rem;
+            }
+            
+            .upload-icon {
+                font-size: 2.5rem;
+            }
+            
+            .format-card:hover {
+                transform: none;
+            }
         }
     </style>
 </head>
@@ -86,119 +334,129 @@
         </div>
     </nav>
 
-    <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="card shadow">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">
-                            <i class="fas fa-upload me-2"></i>上传API文档
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        <form id="uploadForm" enctype="multipart/form-data">
-                            <!-- 文件上传区域 -->
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">选择API文档</label>
-                                <div class="upload-area" id="uploadArea">
-                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                    <h5>拖拽文件到此处或点击选择</h5>
-                                    <p class="text-muted mb-3">支持 PDF、Word、Markdown、TXT 格式</p>
-                                    <input type="file" id="fileInput" name="file" accept=".pdf,.docx,.doc,.md,.markdown,.txt" style="display: none;">
-                                    <button type="button" class="btn btn-outline-primary" id="selectFileBtn">
-                                        <i class="fas fa-folder-open me-2"></i>选择文件
+    <!-- 主容器 -->
+    <div class="container py-2">
+        <div class="main-container">
+            <!-- 上传表单 -->
+            <div class="form-section" id="upload-form">
+                <h2 class="form-title">
+                    <i class="fas fa-upload me-2"></i>上传API文档
+                </h2>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <!-- 文件上传区域 -->
+                    <div class="mb-2">
+                        <label class="form-label">选择API文档</label>
+                        <div class="upload-area" id="uploadArea">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <h3 class="upload-title">拖拽文件到此处或点击选择</h3>
+                            <p class="upload-description">支持 PDF、Word、Markdown、TXT 格式的API文档</p>
+                            <input type="file" id="fileInput" name="file" accept=".pdf,.docx,.doc,.md,.markdown,.txt" style="display: none;">
+                            <button type="button" class="btn btn-outline-primary" id="selectFileBtn">
+                                <i class="fas fa-folder-open me-2"></i>选择文件
+                            </button>
+                        </div>
+                        <div id="filePreview" class="mt-2" style="display: none;">
+                            <div class="file-info">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <i class="fas fa-file me-2"></i>
+                                        <span id="fileName" class="fw-bold"></span>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-light" onclick="removeFile()">
+                                        <i class="fas fa-times"></i>
                                     </button>
                                 </div>
-                                <div id="filePreview" class="mt-3" style="display: none;">
-                                    <div class="alert alert-info">
-                                        <i class="fas fa-file me-2"></i>
-                                        <span id="fileName"></span>
-                                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="removeFile()">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
-
-                            <!-- 服务配置 -->
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="serviceName" class="form-label fw-bold">服务名称 *</label>
-                                    <input type="text" class="form-control" id="serviceName" name="serviceName" required>
-                                    <div class="form-text">为您的Mock Server指定一个名称</div>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="port" class="form-label fw-bold">服务端口 *</label>
-                                    <input type="number" class="form-control" id="port" name="port" value="8081" min="1024" max="65535" required>
-                                    <div class="form-text">Mock Server运行的端口号</div>
-                                </div>
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="description" class="form-label fw-bold">服务描述</label>
-                                <textarea class="form-control" id="description" name="description" rows="3" placeholder="描述您的Mock Server用途..."></textarea>
-                            </div>
-
-                            <!-- 进度条 -->
-                            <div class="progress-container" id="progressContainer">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="fw-bold">正在生成Mock Server...</span>
-                                    <span id="progressText">0%</span>
-                                </div>
-                                <div class="progress">
-                                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <div class="mt-2">
-                                    <small class="text-muted" id="progressDetail">正在解析文档...</small>
-                                </div>
-                            </div>
-
-                            <!-- 提交按钮 -->
-                            <div class="d-flex gap-3">
-                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
-                                    <i class="fas fa-magic me-2"></i>生成Mock Server
-                                </button>
-                                <a href="/" class="btn btn-outline-secondary btn-lg">
-                                    <i class="fas fa-arrow-left me-2"></i>返回首页
-                                </a>
-                            </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
 
-                <!-- 支持格式说明 -->
-                <div class="card mt-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-info-circle me-2"></i>支持的文件格式
-                        </h5>
+                    <!-- 服务配置 -->
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label for="serviceName" class="form-label">服务名称 *</label>
+                            <input type="text" class="form-control" id="serviceName" name="serviceName" required>
+                            <div class="form-text">为您的Mock Server指定一个名称</div>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label for="port" class="form-label">服务端口 *</label>
+                            <input type="number" class="form-control" id="port" name="port" value="8081" min="1024" max="65535" required>
+                            <div class="form-text">Mock Server运行的端口号</div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-3 mb-3">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-file-pdf text-danger me-2"></i>
-                                    <span>PDF文档</span>
-                                </div>
+
+                    <div class="mb-2">
+                        <label for="description" class="form-label">服务描述</label>
+                        <textarea class="form-control" id="description" name="description" rows="1" placeholder="描述您的Mock Server用途..."></textarea>
+                    </div>
+
+                    <!-- 进度条 -->
+                    <div class="progress-container" id="progressContainer">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="fw-bold">正在生成Mock Server...</span>
+                            <span id="progressText">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted" id="progressDetail">正在解析文档...</small>
+                        </div>
+                    </div>
+
+                    <!-- 提交按钮 -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="fas fa-magic me-2"></i>生成Mock Server
+                        </button>
+                        <a href="/" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>返回首页
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 支持格式说明 -->
+            <div class="format-section">
+                <h3 class="text-center mb-2">
+                    <i class="fas fa-info-circle me-2"></i>支持的文件格式
+                </h3>
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <div class="format-card">
+                            <div class="format-icon text-danger">
+                                <i class="fas fa-file-pdf"></i>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-file-word text-primary me-2"></i>
-                                    <span>Word文档</span>
-                                </div>
+                            <h4 class="format-title">PDF文档</h4>
+                            <p class="format-description">支持标准PDF格式的API文档</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="format-card">
+                            <div class="format-icon text-primary">
+                                <i class="fas fa-file-word"></i>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-file-alt text-success me-2"></i>
-                                    <span>Markdown</span>
-                                </div>
+                            <h4 class="format-title">Word文档</h4>
+                            <p class="format-description">支持.docx和.doc格式</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="format-card">
+                            <div class="format-icon text-success">
+                                <i class="fas fa-file-alt"></i>
                             </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-file-text text-secondary me-2"></i>
-                                    <span>文本文件</span>
-                                </div>
+                            <h4 class="format-title">Markdown</h4>
+                            <p class="format-description">支持.md和.markdown格式</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="format-card">
+                            <div class="format-icon text-secondary">
+                                <i class="fas fa-file-text"></i>
                             </div>
+                            <h4 class="format-title">文本文件</h4>
+                            <p class="format-description">支持.txt格式的纯文本</p>
                         </div>
                     </div>
                 </div>

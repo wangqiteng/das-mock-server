@@ -14,6 +14,7 @@
         }
         .endpoint-card:hover {
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
         }
         .method-badge {
             font-size: 0.8rem;
@@ -45,6 +46,12 @@
         .navbar-nav .nav-link {
             white-space: nowrap;
             padding: 0.5rem 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .navbar-nav .nav-link:hover {
+            transform: translateY(-1px);
+            color: #667eea !important;
         }
         
         /* 确保导航栏布局稳定 */
@@ -56,9 +63,131 @@
             width: 100%;
             justify-content: flex-start;
         }
+        
+        /* 按钮动画效果 */
+        .btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.4s ease, height 0.4s ease;
+        }
+        
+        .btn:active::before {
+            width: 200px;
+            height: 200px;
+        }
+        
+        /* 卡片动画效果 */
+        .card {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.03), transparent);
+            transition: left 0.6s ease;
+        }
+        
+        .card:hover::before {
+            left: 100%;
+        }
+        
+        /* 状态徽章动画 */
+        .badge {
+            transition: all 0.3s ease;
+        }
+        
+        .badge.bg-success {
+            animation: successPulse 2s infinite;
+        }
+        
+        .badge.bg-danger {
+            animation: errorPulse 2s infinite;
+        }
+        
+        @keyframes successPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        
+        @keyframes errorPulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+        
+        /* 页面加载动画 */
+        .fade-in {
+            animation: fadeIn 0.6s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Toast通知动画 */
+        .toast {
+            animation: slideInRight 0.3s ease-out;
+        }
+        
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(50px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* 响应式动画 */
+        @media (max-width: 768px) {
+            .endpoint-card:hover {
+                transform: none;
+            }
+            
+            .card:hover {
+                transform: none;
+            }
+            
+            .btn:hover {
+                transform: none;
+            }
+        }
     </style>
 </head>
-<body>
+<body class="fade-in">
     <!-- 导航栏 -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
@@ -616,9 +745,9 @@
                 if (newStatus === 'RUNNING') {
                     // 创建停止按钮
                     const newStopButton = document.createElement('button');
-                    newStopButton.className = 'btn btn-outline-warning';
+                    newStopButton.className = 'btn btn-outline-warning action-btn';
                     newStopButton.setAttribute('data-service-id', serviceId);
-                    newStopButton.onclick = function() { stopService(this.getAttribute('data-service-id')); };
+                    newStopButton.setAttribute('data-action', 'stop');
                     newStopButton.innerHTML = '<i class="fas fa-stop me-1"></i>停止服务';
                     
                     // 插入到第一个位置
@@ -627,9 +756,9 @@
                 } else {
                     // 创建启动按钮
                     const newStartButton = document.createElement('button');
-                    newStartButton.className = 'btn btn-outline-success';
+                    newStartButton.className = 'btn btn-outline-success action-btn';
                     newStartButton.setAttribute('data-service-id', serviceId);
-                    newStartButton.onclick = function() { startService(this.getAttribute('data-service-id')); };
+                    newStartButton.setAttribute('data-action', 'start');
                     newStartButton.innerHTML = '<i class="fas fa-play me-1"></i>启动服务';
                     
                     // 插入到第一个位置
