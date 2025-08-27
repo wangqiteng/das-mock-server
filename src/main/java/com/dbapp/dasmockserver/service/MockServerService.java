@@ -321,4 +321,27 @@ public class MockServerService {
         }
         return "";
     }
+    
+    /**
+     * 获取可用端口
+     */
+    public Integer getAvailablePort() {
+        // 获取所有已使用的端口
+        List<Integer> usedPorts = mockServiceRepository.findAll().stream()
+                .map(MockService::getPort)
+                .toList();
+        
+        // 从8081开始查找可用端口
+        int startPort = 8081;
+        int maxPort = 65535;
+        
+        for (int port = startPort; port <= maxPort; port++) {
+            if (!usedPorts.contains(port)) {
+                return port;
+            }
+        }
+        
+        // 如果没有找到可用端口，返回null
+        return null;
+    }
 } 

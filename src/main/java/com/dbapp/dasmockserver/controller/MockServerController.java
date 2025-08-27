@@ -229,4 +229,23 @@ public class MockServerController {
     public ResponseEntity<Map<String, String>> health() {
         return ResponseEntity.ok(Map.of("status", "UP", "message", "Mock Server Generator is running"));
     }
+    
+    /**
+     * 获取可用端口
+     */
+    @GetMapping("/available-port")
+    public ResponseEntity<Map<String, Object>> getAvailablePort() {
+        try {
+            Integer availablePort = mockServerService.getAvailablePort();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "availablePort", availablePort
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "message", "获取可用端口失败: " + e.getMessage()
+            ));
+        }
+    }
 } 

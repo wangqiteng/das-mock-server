@@ -256,12 +256,14 @@
                                     </button>
                                     <button th:data-service-id="${service.id}"
                                             data-action="regenerate"
-                                            class="btn btn-sm btn-outline-info me-1 action-btn">
+                                            class="btn btn-sm btn-outline-info me-1 action-btn"
+                                            th:onclick="'showConfirmDialog(\'fas fa-sync\', \'重新生成服务\', \'确定要重新生成这个Mock服务吗？这将覆盖现有的代码。\', () => regenerateService(' + ${service.id} + '))'">
                                         <i class="fas fa-sync"></i>
                                     </button>
                                     <button th:data-service-id="${service.id}"
                                             data-action="delete"
-                                            class="btn btn-sm btn-outline-danger action-btn">
+                                            class="btn btn-sm btn-outline-danger action-btn"
+                                            th:onclick="'showConfirmDialog(\'fas fa-trash\', \'删除服务\', \'确定要删除这个Mock服务吗？此操作不可恢复。\', () => deleteService(' + ${service.id} + '))'">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
@@ -403,34 +405,6 @@
                     const serviceId = serviceRow.getAttribute('data-service-id');
                     if (serviceId) {
                         window.location.href = `/service/${serviceId}`;
-                    }
-                }
-            });
-            
-            // 为所有操作按钮添加点击事件
-            document.addEventListener('click', function(e) {
-                if (e.target.closest('.action-btn')) {
-                    const button = e.target.closest('.action-btn');
-                    const serviceId = button.getAttribute('data-service-id');
-                    const action = button.getAttribute('data-action');
-                    
-                    switch(action) {
-                        case 'start':
-                            startService(serviceId);
-                            break;
-                        case 'stop':
-                            stopService(serviceId);
-                            break;
-                        case 'regenerate':
-                            showConfirmDialog('fas fa-sync', '重新生成服务', 
-                                '确定要重新生成这个Mock服务吗？这将覆盖现有的代码。', 
-                                () => regenerateService(serviceId));
-                            break;
-                        case 'delete':
-                            showConfirmDialog('fas fa-trash', '删除服务', 
-                                '确定要删除这个Mock服务吗？此操作不可恢复。', 
-                                () => deleteService(serviceId));
-                            break;
                     }
                 }
             });
@@ -594,77 +568,63 @@
         }
         
         function regenerateService(serviceId) {
-            showConfirmDialog(
-                'fas fa-sync',
-                '重新生成服务',
-                '确定要重新生成服务代码吗？这将重新生成所有API端点的代码。',
-                () => {
-                    // 显示加载状态
-                    const regenerateButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="regenerate"]`);
-                    if (regenerateButton) {
-                        const originalText = regenerateButton.innerHTML;
-                        regenerateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                        regenerateButton.disabled = true;
-                        
-                        fetch(`/api/mock-server/services/${serviceId}/regenerate`, {
-                            method: 'POST'
-                        })
-                        .then(response => {
-                            if (response.ok) {
-                                showToast('success', '生成成功', '服务代码重新生成成功！');
-                                setTimeout(() => location.reload(), 1500);
-                            } else {
-                                throw new Error('生成失败');
-                            }
-                        })
-                        .catch(error => {
-                            showToast('error', '生成失败', '重新生成服务代码时发生错误');
-                        })
-                        .finally(() => {
-                            // 恢复按钮状态
-                            regenerateButton.innerHTML = originalText;
-                            regenerateButton.disabled = false;
-                        });
+            // 显示加载状态
+            const regenerateButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="regenerate"]`);
+            if (regenerateButton) {
+                const originalText = regenerateButton.innerHTML;
+                regenerateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                regenerateButton.disabled = true;
+                
+                fetch(`/api/mock-server/services/${serviceId}/regenerate`, {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('success', '生成成功', '服务代码重新生成成功！');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        throw new Error('生成失败');
                     }
-                }
-            );
+                })
+                .catch(error => {
+                    showToast('error', '生成失败', '重新生成服务代码时发生错误');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    regenerateButton.innerHTML = originalText;
+                    regenerateButton.disabled = false;
+                });
+            }
         }
         
         function deleteService(serviceId) {
-            showConfirmDialog(
-                'fas fa-trash',
-                '删除服务',
-                '确定要删除这个服务吗？此操作不可恢复，所有相关的API端点和配置都将被永久删除！',
-                () => {
-                    // 显示加载状态
-                    const deleteButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="delete"]`);
-                    if (deleteButton) {
-                        const originalText = deleteButton.innerHTML;
-                        deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                        deleteButton.disabled = true;
-                        
-                        fetch(`/api/mock-server/services/${serviceId}`, {
-                            method: 'DELETE'
-                        })
-                        .then(response => {
-                            if (response.ok) {
-                                showToast('success', '删除成功', '服务已成功删除！');
-                                setTimeout(() => location.reload(), 1500);
-                            } else {
-                                throw new Error('删除失败');
-                            }
-                        })
-                        .catch(error => {
-                            showToast('error', '删除失败', '删除服务时发生错误');
-                        })
-                        .finally(() => {
-                            // 恢复按钮状态
-                            deleteButton.innerHTML = originalText;
-                            deleteButton.disabled = false;
-                        });
+            // 显示加载状态
+            const deleteButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="delete"]`);
+            if (deleteButton) {
+                const originalText = deleteButton.innerHTML;
+                deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                deleteButton.disabled = true;
+                
+                fetch(`/api/mock-server/services/${serviceId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('success', '删除成功', '服务已成功删除！');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        throw new Error('删除失败');
                     }
-                }
-            );
+                })
+                .catch(error => {
+                    showToast('error', '删除失败', '删除服务时发生错误');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    deleteButton.innerHTML = originalText;
+                    deleteButton.disabled = false;
+                });
+            }
         }
         
         function updateServiceStatus(serviceId, newStatus) {
