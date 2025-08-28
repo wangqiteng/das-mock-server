@@ -337,6 +337,7 @@ public class CodeGenerationService {
                 String requestClassName = generateClassName(endpoint.getName() + "Request");
                 generateDtoClassFromAiSchema(projectPath, packageName, requestClassName, endpoint.getRequestSchema());
             }
+            
             if (endpoint.getResponseSchema() != null && !endpoint.getResponseSchema().isEmpty()) {
                 String responseClassName = generateClassName(endpoint.getName() + "Response");
                 generateDtoClass(projectPath, packageName, responseClassName, endpoint.getResponseSchema());
@@ -385,6 +386,7 @@ public class CodeGenerationService {
         
         // 解析AI生成的Schema并生成字段
         List<FieldSpec> fields = parseAiSchemaFields(schema);
+        
         for (FieldSpec field : fields) {
             dtoClassBuilder.addField(field);
         }
@@ -448,10 +450,96 @@ public class CodeGenerationService {
         }
         
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode jsonNode = mapper.readTree(schema);
+            // 预处理Schema，处理中文字符问题
+            String processedSchema = schema
+                .replace("、", ",")  // 中文顿号替换为英文逗号
+                .replace("，", ",")  // 中文逗号替换为英文逗号
+                .replace("：", ":")  // 中文冒号替换为英文冒号
+                .replace("\"", "\"")  // 中文引号替换为英文引号
+                .replace("\"", "\"")  // 中文引号替换为英文引号
+                .replace("'", "'")   // 中文单引号替换为英文单引号
+                .replace("'", "'")   // 中文单引号替换为英文单引号
+                .replaceAll("\\s+", " ")  // 规范化空白字符
+                .trim();  // 去除首尾空白
             
-            if (jsonNode.isObject()) {
+            // 尝试修复常见的JSON格式问题
+            processedSchema = processedSchema
+                .replaceAll(",\\s*}", "}")  // 移除对象末尾多余的逗号
+                .replaceAll(",\\s*]", "]"); // 移除数组末尾多余的逗号
+            
+            // 如果预处理后仍然无法解析，尝试更激进的修复
+            if (!isValidJson(processedSchema)) {
+                processedSchema = fixJsonFormat(processedSchema);
+            }
+            
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(processedSchema);
+            
+            // 处理嵌套的requestBody结构
+            if (jsonNode.has("requestBody")) {
+                JsonNode requestBody = jsonNode.get("requestBody");
+                
+                // 检查requestBody的类型
+                String requestBodyType = requestBody.has("type") ? requestBody.get("type").asText() : "object";
+                
+                if ("array".equals(requestBodyType) && requestBody.has("items")) {
+                    // 处理array格式：requestBody.items.properties
+                    JsonNode items = requestBody.get("items");
+                    
+                    if (items.has("properties")) {
+                        JsonNode properties = items.get("properties");
+                        Iterator<Map.Entry<String, JsonNode>> fieldsIterator = properties.fields();
+                        
+                        while (fieldsIterator.hasNext()) {
+                            Map.Entry<String, JsonNode> fieldEntry = fieldsIterator.next();
+                            String fieldName = fieldEntry.getKey();
+                            JsonNode fieldNode = fieldEntry.getValue();
+                            
+                            FieldSpec field = createFieldFromAiSchema(fieldName, fieldNode);
+                            if (field != null) {
+                                fields.add(field);
+                            }
+                        }
+                    }
+                } else if ("object".equals(requestBodyType) && requestBody.has("properties")) {
+                    // 处理object格式：requestBody.properties
+                    JsonNode properties = requestBody.get("properties");
+                    Iterator<Map.Entry<String, JsonNode>> fieldsIterator = properties.fields();
+                    
+                    while (fieldsIterator.hasNext()) {
+                        Map.Entry<String, JsonNode> fieldEntry = fieldsIterator.next();
+                        String fieldName = fieldEntry.getKey();
+                        JsonNode fieldNode = fieldEntry.getValue();
+                        
+                        FieldSpec field = createFieldFromAiSchema(fieldName, fieldNode);
+                        if (field != null) {
+                            fields.add(field);
+                        }
+                    }
+                } else {
+                    // 兼容旧格式：直接检查是否有items.properties结构
+                    if (requestBody.has("items")) {
+                        JsonNode items = requestBody.get("items");
+                        
+                        if (items.has("properties")) {
+                            JsonNode properties = items.get("properties");
+                            Iterator<Map.Entry<String, JsonNode>> fieldsIterator = properties.fields();
+                            
+                            while (fieldsIterator.hasNext()) {
+                                Map.Entry<String, JsonNode> fieldEntry = fieldsIterator.next();
+                                String fieldName = fieldEntry.getKey();
+                                JsonNode fieldNode = fieldEntry.getValue();
+                                
+                                FieldSpec field = createFieldFromAiSchema(fieldName, fieldNode);
+                                if (field != null) {
+                                    fields.add(field);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (jsonNode.isObject()) {
+                // 处理直接的字段结构
                 Iterator<Map.Entry<String, JsonNode>> fieldsIterator = jsonNode.fields();
                 while (fieldsIterator.hasNext()) {
                     Map.Entry<String, JsonNode> fieldEntry = fieldsIterator.next();
@@ -464,13 +552,44 @@ public class CodeGenerationService {
                     }
                 }
             }
+            
         } catch (Exception e) {
             // 如果解析失败，记录错误并返回空列表
             System.err.println("解析AI Schema失败: " + e.getMessage());
-            System.err.println("Schema内容: " + schema);
+            System.err.println("原始Schema内容: " + schema);
+            e.printStackTrace();
         }
         
         return fields;
+    }
+    
+    /**
+     * 检查JSON是否有效
+     */
+    private boolean isValidJson(String json) {
+        try {
+            new ObjectMapper().readTree(json);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * 修复JSON格式
+     */
+    private String fixJsonFormat(String json) {
+        // 移除所有换行符和多余的空格
+        String fixed = json.replaceAll("\\s+", " ");
+        
+        // 修复常见的格式问题
+        fixed = fixed
+            .replaceAll(",\\s*}", "}")
+            .replaceAll(",\\s*]", "]")
+            .replaceAll("\\{\\s*\\}", "{}")
+            .replaceAll("\\[\\s*\\]", "[]");
+        
+        return fixed;
     }
     
     /**

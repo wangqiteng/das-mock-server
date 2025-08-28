@@ -781,40 +781,33 @@
         }
         
         function regenerateService(serviceId) {
-            showConfirmDialog(
-                'fas fa-sync',
-                '重新生成服务',
-                '确定要重新生成服务代码吗？这将重新生成所有API端点的代码。',
-                () => {
-                    // 显示加载状态
-                    const regenerateButton = document.querySelector(`button[data-service-id="${serviceId}"][onclick*="regenerateService"]`);
-                    if (regenerateButton) {
-                        const originalText = regenerateButton.innerHTML;
-                        regenerateButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>生成中...';
-                        regenerateButton.disabled = true;
-                        
-                        fetch(`/api/mock-server/services/${serviceId}/regenerate`, {
-                            method: 'POST'
-                        })
-                        .then(response => {
-                            if (response.ok) {
-                                showToast('success', '生成成功', '服务代码重新生成成功！');
-                                setTimeout(() => location.reload(), 1500);
-                            } else {
-                                throw new Error('生成失败');
-                            }
-                        })
-                        .catch(error => {
-                            showToast('error', '生成失败', '重新生成服务代码时发生错误');
-                        })
-                        .finally(() => {
-                            // 恢复按钮状态
-                            regenerateButton.innerHTML = originalText;
-                            regenerateButton.disabled = false;
-                        });
+            // 显示加载状态
+            const regenerateButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="regenerate"]`);
+            if (regenerateButton) {
+                const originalText = regenerateButton.innerHTML;
+                regenerateButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>生成中...';
+                regenerateButton.disabled = true;
+                
+                fetch(`/api/mock-server/services/${serviceId}/regenerate`, {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('success', '生成成功', '服务代码重新生成成功！');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        throw new Error('生成失败');
                     }
-                }
-            );
+                })
+                .catch(error => {
+                    showToast('error', '生成失败', '重新生成服务代码时发生错误');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    regenerateButton.innerHTML = originalText;
+                    regenerateButton.disabled = false;
+                });
+            }
         }
         
         function editEndpoint(endpointId) {

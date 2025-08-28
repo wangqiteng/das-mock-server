@@ -84,7 +84,7 @@ public class AiCodeGenerationService {
                     "path": "/api/endpoint",
                     "method": "GET|POST|PUT|DELETE|PATCH",
                     "description": "端点描述",
-                    "parameters": {
+                    "requestSchema": {
                         "pathVariables": [
                             {
                                 "name": "参数名",
@@ -102,14 +102,27 @@ public class AiCodeGenerationService {
                             }
                         ],
                         "requestBody": {
-                            "type": "object",
-                            "properties": {
-                                "fieldName": {
-                                    "type": "string|integer|boolean|array|object",
-                                    "required": true|false,
-                                    "description": "字段描述"
+                            // 格式1: array类型
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "fieldName": {
+                                        "type": "string|integer|boolean|array|object",
+                                        "required": true|false,
+                                        "description": "字段描述"
+                                    }
                                 }
                             }
+                            // 格式2: object类型
+                            // "type": "object",
+                            // "properties": {
+                            //     "fieldName": {
+                            //         "type": "string|integer|boolean|array|object",
+                            //         "required": true|false,
+                            //         "description": "字段描述"
+                            //     }
+                            // }
                         }
                     },
                     "responseSchema": {
@@ -144,6 +157,12 @@ public class AiCodeGenerationService {
             11. 如果URL中包含{param}格式，这些参数应该放在pathVariables中
             12. 如果文档中明确提到查询参数，应该放在queryParameters中
             13. 如果文档中明确提到请求体，应该放在requestBody中
+            14. requestBody支持两种格式：
+                - array格式：当请求体是数组时使用，包含type:"array"和items结构
+                - object格式：当请求体是单个对象时使用，包含type:"object"和properties结构
+            15. 根据文档内容判断使用哪种格式：
+                - 如果文档提到"数组"、"列表"、"批量"等关键词，使用array格式
+                - 如果文档提到单个对象或没有明确说明，使用object格式
             
             请确保：
             1. 准确识别HTTP方法和路径
@@ -154,6 +173,7 @@ public class AiCodeGenerationService {
             6. 确保参数信息包含从表格中提取的所有字段
             7. 字段名使用驼峰命名法
             8. 根据HTTP方法和文档内容合理分配参数类型
+            9. 根据文档内容选择合适的requestBody格式（array或object）
             """, documentContent);
     }
     
@@ -297,21 +317,10 @@ public class AiCodeGenerationService {
                 String methodStr = getStringValue(endpointNode, "method", "GET");
                 endpoint.setMethod(parseHttpMethod(methodStr));
                 
-                // 解析参数信息（新格式）
-                JsonNode parameters = endpointNode.get("parameters");
-                if (parameters != null) {
-                    endpoint.setParameters(parameters.toString());
-                    
-                    // 为了向后兼容，也设置requestSchema
-                    if (parameters.has("requestBody") && parameters.get("requestBody").has("properties")) {
-                        endpoint.setRequestSchema(parameters.get("requestBody").toString());
-                    }
-                } else {
-                    // 兼容旧格式：解析requestSchema
-                    JsonNode requestSchema = endpointNode.get("requestSchema");
-                    if (requestSchema != null) {
-                        endpoint.setRequestSchema(requestSchema.toString());
-                    }
+                // 解析参数信息（统一使用requestSchema）
+                JsonNode requestSchema = endpointNode.get("requestSchema");
+                if (requestSchema != null) {
+                    endpoint.setRequestSchema(requestSchema.toString());
                 }
                 
                 // 解析响应Schema
