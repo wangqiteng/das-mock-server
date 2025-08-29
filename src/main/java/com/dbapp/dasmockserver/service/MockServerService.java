@@ -131,50 +131,6 @@ public class MockServerService {
     }
     
     /**
-     * 更新API端点
-     */
-    public ApiEndpoint updateEndpoint(Long endpointId, ApiEndpoint updatedEndpoint) {
-        Optional<ApiEndpoint> optional = apiEndpointRepository.findById(endpointId);
-        if (optional.isPresent()) {
-            ApiEndpoint existing = optional.get();
-            
-            if (updatedEndpoint.getName() != null) {
-                existing.setName(updatedEndpoint.getName());
-            }
-            if (updatedEndpoint.getPath() != null) {
-                existing.setPath(updatedEndpoint.getPath());
-            }
-            if (updatedEndpoint.getMethod() != null) {
-                existing.setMethod(updatedEndpoint.getMethod());
-            }
-            if (updatedEndpoint.getDescription() != null) {
-                existing.setDescription(updatedEndpoint.getDescription());
-            }
-            if (updatedEndpoint.getRequestSchema() != null) {
-                existing.setRequestSchema(updatedEndpoint.getRequestSchema());
-            }
-            if (updatedEndpoint.getResponseSchema() != null) {
-                existing.setResponseSchema(updatedEndpoint.getResponseSchema());
-            }
-            if (updatedEndpoint.getMockResponse() != null) {
-                existing.setMockResponse(updatedEndpoint.getMockResponse());
-            }
-            if (updatedEndpoint.getResponseDelay() != null) {
-                existing.setResponseDelay(updatedEndpoint.getResponseDelay());
-            }
-            if (updatedEndpoint.getStatusCode() != null) {
-                existing.setStatusCode(updatedEndpoint.getStatusCode());
-            }
-            if (updatedEndpoint.getHeaders() != null) {
-                existing.setHeaders(updatedEndpoint.getHeaders());
-            }
-            
-            return apiEndpointRepository.save(existing);
-        }
-        throw new IllegalArgumentException("端点不存在: " + endpointId);
-    }
-    
-    /**
      * 删除Mock服务
      */
     public void deleteMockService(Long serviceId) {
@@ -300,17 +256,42 @@ public class MockServerService {
     public ApiEndpoint updateApiEndpoint(Long id, ApiEndpoint updatedEndpoint) {
         Optional<ApiEndpoint> optional = apiEndpointRepository.findById(id);
         if (optional.isPresent()) {
-            ApiEndpoint endpoint = optional.get();
-            endpoint.setName(updatedEndpoint.getName());
-            endpoint.setPath(updatedEndpoint.getPath());
-            endpoint.setMethod(updatedEndpoint.getMethod());
-            endpoint.setDescription(updatedEndpoint.getDescription());
-            endpoint.setStatusCode(updatedEndpoint.getStatusCode());
-            endpoint.setResponseDelay(updatedEndpoint.getResponseDelay());
-            endpoint.setMockResponse(updatedEndpoint.getMockResponse());
-            return apiEndpointRepository.save(endpoint);
+            ApiEndpoint existing = optional.get();
+            
+            if (updatedEndpoint.getName() != null) {
+                existing.setName(updatedEndpoint.getName());
+            }
+            if (updatedEndpoint.getPath() != null) {
+                existing.setPath(updatedEndpoint.getPath());
+            }
+            if (updatedEndpoint.getMethod() != null) {
+                existing.setMethod(updatedEndpoint.getMethod());
+            }
+            if (updatedEndpoint.getDescription() != null) {
+                existing.setDescription(updatedEndpoint.getDescription());
+            }
+            if (updatedEndpoint.getRequestSchema() != null) {
+                existing.setRequestSchema(updatedEndpoint.getRequestSchema());
+            }
+            if (updatedEndpoint.getResponseSchema() != null) {
+                existing.setResponseSchema(updatedEndpoint.getResponseSchema());
+            }
+            if (updatedEndpoint.getMockResponse() != null) {
+                existing.setMockResponse(updatedEndpoint.getMockResponse());
+            }
+            if (updatedEndpoint.getResponseDelay() != null) {
+                existing.setResponseDelay(updatedEndpoint.getResponseDelay());
+            }
+            if (updatedEndpoint.getStatusCode() != null) {
+                existing.setStatusCode(updatedEndpoint.getStatusCode());
+            }
+            if (updatedEndpoint.getHeaders() != null) {
+                existing.setHeaders(updatedEndpoint.getHeaders());
+            }
+            
+            return apiEndpointRepository.save(existing);
         }
-        throw new IllegalArgumentException("Endpoint not found with id: " + id);
+        throw new IllegalArgumentException("端点不存在: " + id);
     }
     
     /**

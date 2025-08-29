@@ -13,11 +13,15 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/mock-server")
 @CrossOrigin(origins = "*")
 public class MockServerController {
+    
+    private static final Logger log = LoggerFactory.getLogger(MockServerController.class);
     
     @Autowired
     private MockServerService mockServerService;
@@ -83,16 +87,46 @@ public class MockServerController {
             @PathVariable Long id,
             @RequestBody ApiEndpoint updatedEndpoint) {
         try {
+            log.info("开始更新端点: id={}, name={}, path={}", id, updatedEndpoint.getName(), updatedEndpoint.getPath());
+            
+            // 验证输入参数
+            if (updatedEndpoint == null) {
+                log.error("更新端点的请求体为空");
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "请求体不能为空"
+                ));
+            }
+            
+            if (id == null) {
+                log.error("端点ID为空");
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "端点ID不能为空"
+                ));
+            }
+            
             ApiEndpoint endpoint = mockServerService.updateApiEndpoint(id, updatedEndpoint);
+            
+            log.info("端点更新成功: id={}, name={}", id, endpoint.getName());
+            
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "endpoint", endpoint,
                 "mockServiceId", endpoint.getMockService().getId()
             ));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            log.warn("端点不存在: id={}, error={}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("更新端点时发生错误: id={}, error={}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "error", "服务器内部错误: " + e.getMessage()
+            ));
         }
     }
     
