@@ -1354,8 +1354,10 @@ public class CodeGenerationService {
                 // 解析requestBody
                 if (rootNode.has("requestBody") && rootNode.get("requestBody").isObject()) {
                     JsonNode requestBodyNode = rootNode.get("requestBody");
+                    Map<String, ParameterInfo.Property> properties = new HashMap<>();
+                    
+                    // 处理object类型的requestBody
                     if (requestBodyNode.has("properties") && requestBodyNode.get("properties").isObject()) {
-                        Map<String, ParameterInfo.Property> properties = new HashMap<>();
                         JsonNode propertiesNode = requestBodyNode.get("properties");
                         Iterator<Map.Entry<String, JsonNode>> fields = propertiesNode.fields();
                         
@@ -1371,7 +1373,31 @@ public class CodeGenerationService {
                             );
                             properties.put(fieldName, property);
                         }
-                        
+                    }
+                    // 处理array类型的requestBody
+                    else if (requestBodyNode.has("type") && "array".equals(requestBodyNode.get("type").asText()) 
+                             && requestBodyNode.has("items") && requestBodyNode.get("items").isObject()) {
+                        JsonNode itemsNode = requestBodyNode.get("items");
+                        if (itemsNode.has("properties") && itemsNode.get("properties").isObject()) {
+                            JsonNode propertiesNode = itemsNode.get("properties");
+                            Iterator<Map.Entry<String, JsonNode>> fields = propertiesNode.fields();
+                            
+                            while (fields.hasNext()) {
+                                Map.Entry<String, JsonNode> field = fields.next();
+                                String fieldName = field.getKey();
+                                JsonNode fieldNode = field.getValue();
+                                
+                                ParameterInfo.Property property = new ParameterInfo.Property(
+                                    fieldNode.get("type").asText(),
+                                    fieldNode.get("required").asBoolean(),
+                                    fieldNode.has("description") ? fieldNode.get("description").asText() : ""
+                                );
+                                properties.put(fieldName, property);
+                            }
+                        }
+                    }
+                    
+                    if (!properties.isEmpty()) {
                         ParameterInfo.RequestBody requestBody = new ParameterInfo.RequestBody(
                             requestBodyNode.get("type").asText(),
                             properties
@@ -1398,28 +1424,90 @@ public class CodeGenerationService {
         // 根据HTTP方法处理其他参数
         String httpMethod = endpoint.getMethod().name().toLowerCase();
         if ("get".equals(httpMethod) && endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
-            List<String> queryParams = parseQueryParameters(endpoint.getRequestSchema());
-            for (String param : queryParams) {
-                ParameterInfo.Parameter queryParam = new ParameterInfo.Parameter(param, "string", false, "");
-                parameterInfo.getQueryParameters().add(queryParam);
+            // 对于GET请求，尝试从requestSchema中解析查询参数
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode schemaNode = mapper.readTree(endpoint.getRequestSchema());
+                
+                // 检查是否有queryParameters
+                if (schemaNode.has("queryParameters") && schemaNode.get("queryParameters").isArray()) {
+                    JsonNode queryParamsNode = schemaNode.get("queryParameters");
+                    for (JsonNode paramNode : queryParamsNode) {
+                        ParameterInfo.Parameter param = new ParameterInfo.Parameter(
+                            paramNode.get("name").asText(),
+                            paramNode.get("type").asText(),
+                            paramNode.get("required").asBoolean(),
+                            paramNode.has("description") ? paramNode.get("description").asText() : ""
+                        );
+                        parameterInfo.getQueryParameters().add(param);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("解析GET请求的查询参数失败: {}", e.getMessage());
             }
         } else if (("post".equals(httpMethod) || "put".equals(httpMethod) || "patch".equals(httpMethod)) 
                    && endpoint.getRequestSchema() != null && !endpoint.getRequestSchema().isEmpty()) {
-            // 创建requestBody
-            Map<String, ParameterInfo.Property> properties = new HashMap<>();
-            List<FieldSpec> fields = parseSchemaFields(endpoint.getRequestSchema());
-            for (FieldSpec field : fields) {
-                ParameterInfo.Property property = new ParameterInfo.Property(
-                    getFieldTypeString(field.type),
-                    field.annotations.stream().anyMatch(ann -> ann.type.toString().contains("NotNull")),
-                    ""
-                );
-                properties.put(field.name, property);
-            }
-            
-            if (!properties.isEmpty()) {
-                ParameterInfo.RequestBody requestBody = new ParameterInfo.RequestBody("object", properties);
-                parameterInfo.setRequestBody(requestBody);
+            // 对于POST/PUT/PATCH请求，尝试从requestSchema中解析请求体
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode schemaNode = mapper.readTree(endpoint.getRequestSchema());
+                
+                // 检查是否有requestBody
+                if (schemaNode.has("requestBody") && schemaNode.get("requestBody").isObject()) {
+                    JsonNode requestBodyNode = schemaNode.get("requestBody");
+                    Map<String, ParameterInfo.Property> properties = new HashMap<>();
+                    
+                    // 处理object类型的requestBody
+                    if (requestBodyNode.has("properties") && requestBodyNode.get("properties").isObject()) {
+                        JsonNode propertiesNode = requestBodyNode.get("properties");
+                        Iterator<Map.Entry<String, JsonNode>> fields = propertiesNode.fields();
+                        
+                        while (fields.hasNext()) {
+                            Map.Entry<String, JsonNode> field = fields.next();
+                            String fieldName = field.getKey();
+                            JsonNode fieldNode = field.getValue();
+                            
+                            ParameterInfo.Property property = new ParameterInfo.Property(
+                                fieldNode.get("type").asText(),
+                                fieldNode.get("required").asBoolean(),
+                                fieldNode.has("description") ? fieldNode.get("description").asText() : ""
+                            );
+                            properties.put(fieldName, property);
+                        }
+                    }
+                    // 处理array类型的requestBody
+                    else if (requestBodyNode.has("type") && "array".equals(requestBodyNode.get("type").asText()) 
+                             && requestBodyNode.has("items") && requestBodyNode.get("items").isObject()) {
+                        JsonNode itemsNode = requestBodyNode.get("items");
+                        if (itemsNode.has("properties") && itemsNode.get("properties").isObject()) {
+                            JsonNode propertiesNode = itemsNode.get("properties");
+                            Iterator<Map.Entry<String, JsonNode>> fields = propertiesNode.fields();
+                            
+                            while (fields.hasNext()) {
+                                Map.Entry<String, JsonNode> field = fields.next();
+                                String fieldName = field.getKey();
+                                JsonNode fieldNode = field.getValue();
+                                
+                                ParameterInfo.Property property = new ParameterInfo.Property(
+                                    fieldNode.get("type").asText(),
+                                    fieldNode.get("required").asBoolean(),
+                                    fieldNode.has("description") ? fieldNode.get("description").asText() : ""
+                                );
+                                properties.put(fieldName, property);
+                            }
+                        }
+                    }
+                    
+                    if (!properties.isEmpty()) {
+                        ParameterInfo.RequestBody requestBody = new ParameterInfo.RequestBody(
+                            requestBodyNode.get("type").asText(),
+                            properties
+                        );
+                        parameterInfo.setRequestBody(requestBody);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("解析POST/PUT/PATCH请求的请求体失败: {}", e.getMessage());
             }
         }
         
