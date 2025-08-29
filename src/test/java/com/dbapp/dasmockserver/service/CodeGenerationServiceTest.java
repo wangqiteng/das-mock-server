@@ -1,5 +1,6 @@
 package com.dbapp.dasmockserver.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 
+@Slf4j
 public class CodeGenerationServiceTest {
 
     @Test
@@ -157,8 +159,7 @@ public class CodeGenerationServiceTest {
             }
             
         } catch (Exception e) {
-            System.err.println("解析失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("解析失败: " + e.getMessage(), e);
         }
     }
 
@@ -273,8 +274,7 @@ public class CodeGenerationServiceTest {
             }
             
         } catch (Exception e) {
-            System.err.println("❌ 解析失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ 解析失败: " + e.getMessage(), e);
             assert false : "解析失败: " + e.getMessage();
         }
     }
@@ -542,8 +542,7 @@ public class CodeGenerationServiceTest {
             }
             
         } catch (Exception e) {
-            System.err.println("❌ 解析失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ 解析失败: " + e.getMessage(), e);
             assert false : "解析失败: " + e.getMessage();
         }
     }
@@ -633,8 +632,7 @@ public class CodeGenerationServiceTest {
             }
             
         } catch (Exception e) {
-            System.err.println("❌ 解析失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ 解析失败: " + e.getMessage(), e);
             assert false : "解析失败: " + e.getMessage();
         }
     }
@@ -706,8 +704,7 @@ public class CodeGenerationServiceTest {
             System.out.println("✅ 两种格式都能正确解析");
             
         } catch (Exception e) {
-            System.err.println("❌ 比较测试失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ 比较测试失败: " + e.getMessage(), e);
             assert false : "比较测试失败: " + e.getMessage();
         }
     }

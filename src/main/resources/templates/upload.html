@@ -391,6 +391,62 @@
                         <textarea class="form-control" id="description" name="description" rows="1" placeholder="描述您的Mock Server用途..."></textarea>
                     </div>
 
+                    <!-- AI模型配置 -->
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">
+                                <i class="fas fa-robot me-2"></i>AI模型配置
+                            </label>
+                            <button type="button" class="btn btn-sm btn-outline-info" id="aiConfigToggle">
+                                <i class="fas fa-cog me-1"></i>高级配置
+                            </button>
+                        </div>
+                        
+                        <!-- 基础配置 -->
+                        <div class="row" id="basicAiConfig">
+                            <div class="col-md-6 mb-2">
+                                <label for="aiModel" class="form-label">AI模型</label>
+                                <select class="form-select" id="aiModel" name="aiModel">
+                                    <option value="qwen-turbo">通义千问Turbo</option>
+                                    <option value="qwen-plus">通义千问Plus</option>
+                                    <option value="qwen-max">通义千问Max</option>
+                                    <option value="qwen-max-longcontext">通义千问Max长文本</option>
+                                </select>
+                                <div class="form-text">选择用于生成代码的AI模型</div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label for="aiTemperature" class="form-label">创造性 (Temperature)</label>
+                                <input type="range" class="form-range" id="aiTemperature" name="aiTemperature" 
+                                       min="0" max="2" step="0.1" value="0.1">
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">保守 (0.0)</small>
+                                    <small class="text-muted" id="temperatureValue">0.1</small>
+                                    <small class="text-muted">创造性 (2.0)</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 高级配置 -->
+                        <div class="row" id="advancedAiConfig" style="display: none;">
+                            <div class="col-md-6 mb-2">
+                                <label for="aiMaxTokens" class="form-label">最大Token数</label>
+                                <input type="number" class="form-control" id="aiMaxTokens" name="aiMaxTokens" 
+                                       min="1000" max="8000" step="500" value="4000">
+                                <div class="form-text">控制生成文本的最大长度</div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label for="aiTopP" class="form-label">Top-P采样</label>
+                                <input type="range" class="form-range" id="aiTopP" name="aiTopP" 
+                                       min="0" max="1" step="0.1" value="0.7">
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">确定性 (0.0)</small>
+                                    <small class="text-muted" id="topPValue">0.7</small>
+                                    <small class="text-muted">多样性 (1.0)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- 进度条 -->
                     <div class="progress-container" id="progressContainer">
                         <div class="d-flex justify-content-between mb-2">
@@ -628,6 +684,76 @@
             filePreview.style.display = 'none';
         }
 
+        // AI配置相关功能
+        const aiConfigToggle = document.getElementById('aiConfigToggle');
+        const basicAiConfig = document.getElementById('basicAiConfig');
+        const advancedAiConfig = document.getElementById('advancedAiConfig');
+        const temperatureSlider = document.getElementById('aiTemperature');
+        const temperatureValue = document.getElementById('temperatureValue');
+        const topPSlider = document.getElementById('aiTopP');
+        const topPValue = document.getElementById('topPValue');
+
+        // 切换高级配置
+        aiConfigToggle.addEventListener('click', () => {
+            const isAdvanced = advancedAiConfig.style.display !== 'none';
+            if (isAdvanced) {
+                advancedAiConfig.style.display = 'none';
+                aiConfigToggle.innerHTML = '<i class="fas fa-cog me-1"></i>高级配置';
+            } else {
+                advancedAiConfig.style.display = 'block';
+                aiConfigToggle.innerHTML = '<i class="fas fa-eye-slash me-1"></i>隐藏高级配置';
+            }
+        });
+
+        // 温度滑块实时更新
+        temperatureSlider.addEventListener('input', (e) => {
+            temperatureValue.textContent = e.target.value;
+        });
+
+        // Top-P滑块实时更新
+        topPSlider.addEventListener('input', (e) => {
+            topPValue.textContent = e.target.value;
+        });
+
+        // 加载当前AI配置
+        async function loadAiConfig() {
+            try {
+                const response = await fetch('/api/ai-config');
+                if (response.ok) {
+                    const data = await response.json();
+                    const currentConfig = data.currentConfig;
+                    
+                    // 设置当前配置
+                    document.getElementById('aiModel').value = currentConfig.modelName;
+                    document.getElementById('aiTemperature').value = currentConfig.temperature;
+                    document.getElementById('aiMaxTokens').value = currentConfig.maxTokens;
+                    document.getElementById('aiTopP').value = currentConfig.topP;
+                    
+                    // 更新显示值
+                    temperatureValue.textContent = currentConfig.temperature;
+                    topPValue.textContent = currentConfig.topP;
+                }
+            } catch (error) {
+                console.error('加载AI配置失败，使用默认配置:', error);
+                // 使用默认配置
+                setDefaultAiConfig();
+            }
+        }
+        
+        // 设置默认AI配置
+        function setDefaultAiConfig() {
+            document.getElementById('aiModel').value = 'qwen-turbo';
+            document.getElementById('aiTemperature').value = '0.1';
+            document.getElementById('aiMaxTokens').value = '4000';
+            document.getElementById('aiTopP').value = '0.7';
+            
+            temperatureValue.textContent = '0.1';
+            topPValue.textContent = '0.7';
+        }
+
+        // 页面加载时获取AI配置
+        document.addEventListener('DOMContentLoaded', loadAiConfig);
+
         // 表单提交
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -642,6 +768,12 @@
             formData.append('serviceName', document.getElementById('serviceName').value);
             formData.append('description', document.getElementById('description').value);
             formData.append('port', document.getElementById('port').value);
+            
+            // 添加AI配置参数
+            formData.append('aiModel', document.getElementById('aiModel').value);
+            formData.append('aiTemperature', document.getElementById('aiTemperature').value);
+            formData.append('aiMaxTokens', document.getElementById('aiMaxTokens').value);
+            formData.append('aiTopP', document.getElementById('aiTopP').value);
 
             // 显示进度条
             progressContainer.style.display = 'block';

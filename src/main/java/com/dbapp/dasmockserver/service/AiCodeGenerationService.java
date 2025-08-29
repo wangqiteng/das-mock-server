@@ -1,5 +1,6 @@
 package com.dbapp.dasmockserver.service;
 
+import com.dbapp.dasmockserver.config.AiConfig;
 import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.model.ApiEndpoint.HttpMethod;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @Service
 @Slf4j
@@ -23,7 +25,28 @@ public class AiCodeGenerationService {
     @Autowired(required = false)
     private ChatClient chatClient;
     
+    @Autowired
+    private AiConfigService aiConfigService;
+    
     private final ObjectMapper objectMapper = new ObjectMapper();
+    
+    // 临时AI配置，用于单次生成
+    private ThreadLocal<AiConfig.AiModelConfig> temporaryConfig = new ThreadLocal<>();
+    
+    /**
+     * 设置临时AI配置（仅用于当前线程的本次生成）
+     */
+    public void setTemporaryAiConfig(String modelName, Double temperature, Integer maxTokens, Double topP) {
+        AiConfig.AiModelConfig config = new AiConfig.AiModelConfig(modelName, temperature, maxTokens, topP);
+        temporaryConfig.set(config);
+    }
+    
+    /**
+     * 清除临时AI配置
+     */
+    public void clearTemporaryAiConfig() {
+        temporaryConfig.remove();
+    }
     
     /**
      * 使用AI分析文档并生成API端点信息
@@ -36,7 +59,8 @@ public class AiCodeGenerationService {
         
         String prompt = buildApiAnalysisPrompt(documentContent);
         
-        String aiResponse = chatClient.prompt().user(prompt).call().content();
+        // 使用动态配置调用AI
+        String aiResponse = callAiWithDynamicConfig(prompt);
         
         return parseApiEndpointsFromAiResponse(aiResponse, mockService);
     }
@@ -52,7 +76,8 @@ public class AiCodeGenerationService {
         
         String prompt = buildCodeGenerationPrompt(mockService, endpoints);
         
-        return chatClient.prompt().user(prompt).call().content();
+        // 使用动态配置调用AI
+        return callAiWithDynamicConfig(prompt);
     }
     
     /**
@@ -66,7 +91,8 @@ public class AiCodeGenerationService {
         
         String prompt = buildMockResponsePrompt(endpoint);
         
-        String response = chatClient.prompt().user(prompt).call().content();
+        // 使用动态配置调用AI
+        String response = callAiWithDynamicConfig(prompt);
         
         // 清理响应，移除markdown格式
         return cleanMockResponse(response);
@@ -297,76 +323,512 @@ public class AiCodeGenerationService {
     private List<ApiEndpoint> parseApiEndpointsFromAiResponse(String aiResponse, MockService mockService) {
         List<ApiEndpoint> endpoints = new ArrayList<>();
         
+        if (aiResponse == null || aiResponse.trim().isEmpty()) {
+            log.warn("AI响应为空，返回空端点列表");
+            return endpoints;
+        }
+        
         try {
             // 清理AI响应，提取JSON部分
             String jsonContent = extractJsonFromResponse(aiResponse);
+            log.info("提取的JSON内容长度: {}", jsonContent.length());
             
-            // 解析JSON数组
-            List<JsonNode> endpointNodes = objectMapper.readValue(jsonContent, new TypeReference<List<JsonNode>>() {});
-            
-            for (JsonNode endpointNode : endpointNodes) {
-                ApiEndpoint endpoint = new ApiEndpoint();
-                endpoint.setMockService(mockService);
-                
-                // 解析基本信息
-                endpoint.setName(getStringValue(endpointNode, "name", "未命名端点"));
-                endpoint.setPath(getStringValue(endpointNode, "path", "/api/unknown"));
-                endpoint.setDescription(getStringValue(endpointNode, "description", ""));
-                
-                // 解析HTTP方法
-                String methodStr = getStringValue(endpointNode, "method", "GET");
-                endpoint.setMethod(parseHttpMethod(methodStr));
-                
-                // 解析参数信息（统一使用requestSchema）
-                JsonNode requestSchema = endpointNode.get("requestSchema");
-                if (requestSchema != null) {
-                    endpoint.setRequestSchema(requestSchema.toString());
-                }
-                
-                // 解析响应Schema
-                JsonNode responseSchema = endpointNode.get("responseSchema");
-                if (responseSchema != null) {
-                    endpoint.setResponseSchema(responseSchema.toString());
-                }
-                
-                // 设置默认值
-                endpoint.setMockResponse("{}");
-                endpoint.setResponseDelay(0);
-                endpoint.setStatusCode(200);
-                endpoint.setHeaders(Map.of()); // 使用空的Map而不是字符串
-                
-                endpoints.add(endpoint);
+            // 如果提取的内容为空或太短，尝试直接解析
+            if (jsonContent.length() < 10) {
+                log.warn("提取的JSON内容太短，尝试直接解析原始响应");
+                jsonContent = aiResponse.trim();
             }
             
-        } catch (JsonProcessingException e) {
-            // 如果JSON解析失败，记录错误并返回空列表
-            System.err.println("解析AI响应JSON失败: " + e.getMessage());
-            System.err.println("AI响应内容: " + aiResponse);
+            // 尝试解析JSON数组
+            List<JsonNode> endpointNodes = null;
+            
+            // 首先尝试解析为数组
+            try {
+                endpointNodes = objectMapper.readValue(jsonContent, new TypeReference<List<JsonNode>>() {});
+                log.info("成功解析为JSON数组，节点数量: {}", endpointNodes.size());
+            } catch (Exception e) {
+                log.warn("解析JSON数组失败，尝试解析单个对象: {}", e.getMessage());
+                
+                // 如果解析数组失败，尝试解析单个对象并包装成数组
+                try {
+                    JsonNode singleNode = objectMapper.readTree(jsonContent);
+                    endpointNodes = List.of(singleNode);
+                    log.info("成功解析为单个对象，包装成数组");
+                } catch (Exception e2) {
+                    log.warn("解析单个对象也失败: {}", e2.getMessage());
+                    
+                    // 如果所有解析都失败，尝试手动解析
+                    log.warn("尝试手动解析JSON内容");
+                    endpointNodes = manualParseJson(jsonContent);
+                }
+            }
+            
+            if (endpointNodes == null || endpointNodes.isEmpty()) {
+                log.warn("解析到的端点节点为空");
+                return endpoints;
+            }
+            
+            for (int i = 0; i < endpointNodes.size(); i++) {
+                JsonNode endpointNode = endpointNodes.get(i);
+                try {
+                    ApiEndpoint endpoint = new ApiEndpoint();
+                    endpoint.setMockService(mockService);
+                    
+                    // 解析基本信息
+                    endpoint.setName(getStringValue(endpointNode, "name", "未命名端点_" + i));
+                    endpoint.setPath(getStringValue(endpointNode, "path", "/api/unknown"));
+                    endpoint.setDescription(getStringValue(endpointNode, "description", ""));
+                    
+                    // 解析HTTP方法
+                    String methodStr = getStringValue(endpointNode, "method", "GET");
+                    endpoint.setMethod(parseHttpMethod(methodStr));
+                    
+                    // 解析参数信息（统一使用requestSchema）
+                    JsonNode requestSchema = endpointNode.get("requestSchema");
+                    if (requestSchema != null) {
+                        endpoint.setRequestSchema(requestSchema.toString());
+                    } else {
+                        // 如果没有requestSchema，尝试从其他字段获取
+                        JsonNode parameters = endpointNode.get("parameters");
+                        if (parameters != null) {
+                            endpoint.setRequestSchema(parameters.toString());
+                        } else {
+                            endpoint.setRequestSchema("{}");
+                        }
+                    }
+                    
+                    // 解析响应Schema
+                    JsonNode responseSchema = endpointNode.get("responseSchema");
+                    if (responseSchema != null) {
+                        endpoint.setResponseSchema(responseSchema.toString());
+                    } else {
+                        endpoint.setResponseSchema("{}");
+                    }
+                    
+                    // 设置默认值
+                    endpoint.setMockResponse("{}");
+                    endpoint.setResponseDelay(0);
+                    endpoint.setStatusCode(200);
+                    endpoint.setHeaders(Map.of()); // 使用空的Map而不是字符串
+                    
+                    endpoints.add(endpoint);
+                    log.info("成功解析端点: {}", endpoint.getName() + " - " + endpoint.getPath());
+                    
+                } catch (Exception e) {
+                    log.warn("解析第{}个端点时发生错误: {}", (i + 1), e.getMessage());
+                    // 继续处理下一个端点，不中断整个流程
+                }
+            }
+            
         } catch (Exception e) {
-            // 处理其他异常
-            System.err.println("解析API端点时发生错误: " + e.getMessage());
+            // 处理所有异常
+            log.error("解析API端点时发生错误: {}", e.getMessage());
+            e.printStackTrace();
         }
         
+        log.info("总共解析到 {} 个端点", endpoints.size());
         return endpoints;
+    }
+    
+    /**
+     * 手动解析JSON内容
+     */
+    private List<JsonNode> manualParseJson(String jsonContent) {
+        List<JsonNode> nodes = new ArrayList<>();
+        
+        try {
+            // 尝试从JSON内容中提取基本的端点信息
+            if (jsonContent.contains("\"name\"") && jsonContent.contains("\"path\"")) {
+                log.info("检测到可能的端点信息，尝试手动解析");
+                
+                // 创建一个基本的端点节点
+                ObjectNode endpointNode = objectMapper.createObjectNode();
+                endpointNode.put("name", "手动解析端点");
+                endpointNode.put("path", "/api/manual");
+                endpointNode.put("method", "GET");
+                endpointNode.put("description", "手动解析的端点");
+                
+                // 创建空的requestSchema和responseSchema
+                ObjectNode requestSchema = objectMapper.createObjectNode();
+                requestSchema.putArray("pathVariables");
+                requestSchema.putArray("queryParameters");
+                requestSchema.set("requestBody", objectMapper.createObjectNode());
+                endpointNode.set("requestSchema", requestSchema);
+                
+                ObjectNode responseSchema = objectMapper.createObjectNode();
+                endpointNode.set("responseSchema", responseSchema);
+                
+                nodes.add(endpointNode);
+                log.info("手动解析成功，创建了1个基本端点");
+            }
+        } catch (Exception e) {
+            log.error("手动解析失败: {}", e.getMessage());
+        }
+        
+        return nodes;
     }
     
     /**
      * 从AI响应中提取JSON内容
      */
     private String extractJsonFromResponse(String aiResponse) {
-        // 移除可能的markdown代码块标记
+        if (aiResponse == null || aiResponse.trim().isEmpty()) {
+            return "[]";
+        }
+        
         String cleaned = aiResponse.trim();
+        log.info("原始AI响应长度: {}", cleaned.length());
+        
+        // 首先尝试从Spring AI响应格式中提取JSON
+        // Spring AI响应格式通常是：{"result":{"output":{"text":"[JSON内容]"}}}
+        try {
+            JsonNode responseNode = objectMapper.readTree(cleaned);
+            
+            // 尝试从result.output.text中提取
+            if (responseNode.has("result") && responseNode.get("result").has("output")) {
+                JsonNode outputNode = responseNode.get("result").get("output");
+                if (outputNode.has("text")) {
+                    String jsonText = outputNode.get("text").asText();
+                    if (jsonText != null && !jsonText.trim().isEmpty()) {
+                        log.info("从result.output.text中提取到JSON，长度: {}", jsonText.length());
+                        log.info("JSON内容预览: {}", jsonText.substring(0, Math.min(100, jsonText.length())));
+                        return processJsonContent(jsonText);
+                    }
+                }
+            }
+            
+            // 尝试从results[0].output.text中提取
+            if (responseNode.has("results") && responseNode.get("results").isArray() && responseNode.get("results").size() > 0) {
+                JsonNode firstResult = responseNode.get("results").get(0);
+                if (firstResult.has("output") && firstResult.get("output").has("text")) {
+                    String jsonText = firstResult.get("output").get("text").asText();
+                    if (jsonText != null && !jsonText.trim().isEmpty()) {
+                        log.info("从results[0].output.text中提取到JSON，长度: {}", jsonText.length());
+                        log.info("JSON内容预览: {}", jsonText.substring(0, Math.min(100, jsonText.length())));
+                        return processJsonContent(jsonText);
+                    }
+                }
+            }
+            
+        } catch (Exception e) {
+            log.error("解析Spring AI响应格式失败，尝试直接处理: {}", e.getMessage());
+            log.error("错误类型: {}", e.getClass().getSimpleName());
+        }
+        
+        // 如果不是Spring AI响应格式，按原来的方式处理
+        return processJsonContent(cleaned);
+    }
+    
+    /**
+     * 处理JSON内容
+     */
+    private String processJsonContent(String jsonContent) {
+        if (jsonContent == null || jsonContent.trim().isEmpty()) {
+            return "[]";
+        }
+        
+        log.info("开始处理JSON内容，原始长度: {}", jsonContent.length());
+        
+        // 移除可能的markdown代码块标记
+        String cleaned = jsonContent.trim();
         if (cleaned.startsWith("```json")) {
             cleaned = cleaned.substring(7);
+            log.info("移除了```json标记");
         }
         if (cleaned.startsWith("```")) {
             cleaned = cleaned.substring(3);
+            log.info("移除了```标记");
         }
         if (cleaned.endsWith("```")) {
             cleaned = cleaned.substring(0, cleaned.length() - 3);
+            log.info("移除了结尾的```标记");
         }
         
-        return cleaned.trim();
+        cleaned = cleaned.trim();
+        log.info("清理后长度: {}", cleaned.length());
+        
+        // 尝试修复JSON格式问题
+        cleaned = fixJsonFormat(cleaned);
+        log.info("格式修复后长度: {}", cleaned.length());
+        
+        // 验证JSON格式
+        if (!isValidJson(cleaned)) {
+            log.error("JSON格式验证失败，尝试进一步修复: {}", cleaned);
+            log.error("失败内容预览: {}", cleaned.substring(0, Math.min(200, cleaned.length())));
+            
+            // 尝试更温和的修复
+            String gentlyFixed = gentleJsonFix(cleaned);
+            if (isValidJson(gentlyFixed)) {
+                log.info("温和修复成功，长度: {}", gentlyFixed.length());
+                return gentlyFixed;
+            }
+            
+            // 如果温和修复失败，尝试激进修复
+            cleaned = aggressiveJsonFix(cleaned);
+            log.info("激进修复后长度: {}", cleaned.length());
+        } else {
+            log.info("JSON格式验证通过");
+        }
+        
+        return cleaned;
+    }
+    
+    /**
+     * 温和的JSON修复
+     */
+    private String gentleJsonFix(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return "[]";
+        }
+        
+        String fixed = json.trim();
+        log.info("开始温和修复，原始长度: {}", fixed.length());
+        
+        // 只进行最基本的修复，不改变结构
+        fixed = fixed
+            .replaceAll(",\\s*}", "}")  // 移除对象末尾多余的逗号
+            .replaceAll(",\\s*]", "]")  // 移除数组末尾多余的逗号
+            .replaceAll("\\s+", " ");   // 规范化空白字符
+        
+        // 修复中文标点符号
+        fixed = fixed
+            .replace("，", ",")  // 中文逗号替换为英文逗号
+            .replace("：", ":")  // 中文冒号替换为英文冒号
+            .replace("\"", "\"")  // 中文引号替换为英文引号
+            .replace("\"", "\"")  // 中文引号替换为英文引号
+            .replace("'", "'")   // 中文单引号替换为英文单引号
+            .replace("'", "'");  // 中文单引号替换为英文单引号
+        
+        log.info("温和修复后长度: {}", fixed.length());
+        return fixed;
+    }
+    
+    /**
+     * 修复JSON格式问题
+     */
+    private String fixJsonFormat(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return "[]";
+        }
+        
+        String fixed = json.trim();
+        
+        // 移除多余的空白字符
+        fixed = fixed.replaceAll("\\s+", " ");
+        
+        // 修复常见的格式问题
+        fixed = fixed
+            .replaceAll(",\\s*}", "}")  // 移除对象末尾多余的逗号
+            .replaceAll(",\\s*]", "]")  // 移除数组末尾多余的逗号
+            .replaceAll("\\{\\s*\\}", "{}")  // 规范化空对象
+            .replaceAll("\\[\\s*\\]", "[]"); // 规范化空数组
+        
+        // 修复中文标点符号
+        fixed = fixed
+            .replace("，", ",")  // 中文逗号替换为英文逗号
+            .replace("：", ":")  // 中文冒号替换为英文冒号
+            .replace("\"", "\"")  // 中文引号替换为英文引号
+            .replace("\"", "\"")  // 中文引号替换为英文引号
+            .replace("'", "'")   // 中文单引号替换为英文单引号
+            .replace("'", "'");  // 中文单引号替换为英文单引号
+        
+        return fixed;
+    }
+    
+    /**
+     * 检查JSON是否有效
+     */
+    private boolean isValidJson(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return false;
+        }
+        
+        try {
+            objectMapper.readTree(json);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * 激进的JSON修复
+     */
+    private String aggressiveJsonFix(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return "[]";
+        }
+        
+        String fixed = json.trim();
+        log.info("开始激进修复，原始长度: {}", fixed.length());
+        
+        // 如果内容看起来像JSON数组，但缺少括号，尝试补全
+        if (fixed.startsWith("[") && !fixed.endsWith("]")) {
+            log.info("检测到不完整的数组，尝试补全括号");
+            // 计算括号平衡
+            int openBrackets = 0;
+            int openBraces = 0;
+            boolean inString = false;
+            boolean escaped = false;
+            
+            for (int i = 0; i < fixed.length(); i++) {
+                char c = fixed.charAt(i);
+                
+                if (escaped) {
+                    escaped = false;
+                    continue;
+                }
+                
+                if (c == '\\') {
+                    escaped = true;
+                    continue;
+                }
+                
+                if (c == '"' && !escaped) {
+                    inString = !inString;
+                    continue;
+                }
+                
+                if (!inString) {
+                    if (c == '[') openBrackets++;
+                    else if (c == ']') openBrackets--;
+                    else if (c == '{') openBraces++;
+                    else if (c == '}') openBraces--;
+                }
+            }
+            
+            log.info("括号统计: [={}, {}={}", openBrackets, openBraces);
+            
+            // 补全缺失的括号
+            while (openBrackets > 0) {
+                fixed += "]";
+                openBrackets--;
+            }
+            while (openBraces > 0) {
+                fixed += "}";
+                openBraces--;
+            }
+            
+            log.info("补全括号后长度: {}", fixed.length());
+        }
+        
+        // 如果内容看起来像JSON对象，但期望数组，尝试包装成数组
+        if (fixed.startsWith("{") && fixed.endsWith("}")) {
+            log.info("检测到单个对象，包装成数组");
+            fixed = "[" + fixed + "]";
+        }
+        
+        // 如果内容不是以[或{开头，尝试包装成数组
+        if (!fixed.startsWith("[") && !fixed.startsWith("{")) {
+            log.info("检测到非标准JSON格式，尝试查找JSON结构");
+            // 尝试找到第一个{或[的位置
+            int firstBrace = fixed.indexOf('{');
+            int firstBracket = fixed.indexOf('[');
+            
+            if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
+                // 找到对象，包装成数组
+                log.info("找到对象结构，包装成数组");
+                fixed = "[" + fixed.substring(firstBrace) + "]";
+            } else if (firstBracket >= 0) {
+                // 找到数组，包装
+                log.info("找到数组结构，包装");
+                fixed = "[" + fixed.substring(firstBracket) + "]";
+            } else {
+                // 没有找到有效的JSON结构，返回空数组
+                log.info("未找到有效JSON结构，返回空数组");
+                return "[]";
+            }
+        }
+        
+        // 尝试修复转义字符问题
+        fixed = fixEscapeCharacters(fixed);
+        
+        // 尝试修复引号问题
+        fixed = fixQuoteIssues(fixed);
+        
+        // 最终验证
+        if (!isValidJson(fixed)) {
+            log.error("激进修复后仍然无效，返回空数组");
+            log.error("最终内容预览: {}", fixed.substring(0, Math.min(200, fixed.length())));
+            
+            // 如果激进修复失败，尝试返回原始内容（如果看起来像JSON）
+            if (json.trim().startsWith("[") || json.trim().startsWith("{")) {
+                log.info("激进修复失败，但原始内容看起来像JSON，尝试返回原始内容");
+                return json.trim();
+            }
+            
+            return "[]";
+        }
+        
+        log.info("激进修复成功，最终长度: {}", fixed.length());
+        return fixed;
+    }
+    
+    /**
+     * 修复转义字符问题
+     */
+    private String fixEscapeCharacters(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return json;
+        }
+        
+        String fixed = json;
+        
+        // 修复常见的转义字符问题
+        fixed = fixed
+            .replace("\\\"", "\"")  // 修复过度转义的引号
+            .replace("\\\\", "\\")  // 修复过度转义的反斜杠
+            .replace("\\n", "\n")   // 修复换行符
+            .replace("\\t", "\t")   // 修复制表符
+            .replace("\\r", "\r");  // 修复回车符
+        
+        return fixed;
+    }
+    
+    /**
+     * 修复引号问题
+     */
+    private String fixQuoteIssues(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return json;
+        }
+        
+        String fixed = json;
+        
+        // 修复不匹配的引号
+        int quoteCount = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        
+        for (int i = 0; i < fixed.length(); i++) {
+            char c = fixed.charAt(i);
+            
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+            
+            if (c == '"') {
+                quoteCount++;
+                inString = !inString;
+            }
+        }
+        
+        // 如果引号数量是奇数，尝试修复
+        if (quoteCount % 2 != 0) {
+            log.info("检测到不匹配的引号，尝试修复");
+            // 在末尾添加缺失的引号
+            if (!fixed.endsWith("\"")) {
+                fixed += "\"";
+            }
+        }
+        
+        return fixed;
     }
     
     /**
@@ -385,7 +847,7 @@ public class AiCodeGenerationService {
             return HttpMethod.valueOf(methodStr.toUpperCase());
         } catch (IllegalArgumentException e) {
             // 如果解析失败，返回GET作为默认值
-            System.err.println("无法解析HTTP方法: " + methodStr + ", 使用默认值GET");
+            log.warn("无法解析HTTP方法: {}, 使用默认值GET", methodStr);
             return HttpMethod.GET;
         }
     }
@@ -828,5 +1290,40 @@ public class AiCodeGenerationService {
         );
         
         return chatClient.prompt().user(prompt).call().content();
+    }
+
+    /**
+     * 使用动态配置调用AI
+     */
+    private String callAiWithDynamicConfig(String prompt) {
+        try {
+            // 优先使用临时配置，然后是动态配置，最后是静态配置
+            AiConfig.AiModelConfig config = temporaryConfig.get();
+            String configSource = "临时配置";
+            
+            if (config == null) {
+                config = aiConfigService.getCurrentConfig();
+                configSource = aiConfigService.getConfigSource();
+            }
+            
+            // 记录配置信息
+            log.info("使用AI配置: model={}, temperature={}, maxTokens={}, topP={}, source={}", 
+                config.getModelName(), config.getTemperature(), config.getMaxTokens(), 
+                config.getTopP(), configSource);
+            
+            // 调用AI并返回结果
+            String result = chatClient.prompt().user(prompt).call().content();
+            
+            // 清除临时配置
+            if (temporaryConfig.get() != null) {
+                clearTemporaryAiConfig();
+            }
+            
+            return result;
+            
+        } catch (Exception e) {
+            log.error("AI调用失败: {}", e.getMessage(), e);
+            throw new RuntimeException("AI调用失败: " + e.getMessage(), e);
+        }
     }
 } 

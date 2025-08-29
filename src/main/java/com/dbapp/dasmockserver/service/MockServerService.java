@@ -54,7 +54,9 @@ public class MockServerService {
      * 上传文档并生成Mock服务
      */
     public MockService generateMockServiceFromDocument(MultipartFile file, String serviceName, 
-                                                      String description, Integer port) throws IOException {
+                                                      String description, Integer port,
+                                                      String aiModel, Double aiTemperature, 
+                                                      Integer aiMaxTokens, Double aiTopP) throws IOException {
         // 验证文件格式
         if (!documentParserService.isSupportedFormat(file.getOriginalFilename())) {
             throw new IllegalArgumentException("不支持的文件格式");
@@ -71,6 +73,9 @@ public class MockServerService {
         mockService = mockServiceRepository.save(mockService);
         
         try {
+            // 临时设置AI配置用于本次生成
+            aiCodeGenerationService.setTemporaryAiConfig(aiModel, aiTemperature, aiMaxTokens, aiTopP);
+            
             // 使用AI分析文档并生成API端点
             List<ApiEndpoint> endpoints = aiCodeGenerationService.generateApiEndpoints(documentContent, mockService);
             

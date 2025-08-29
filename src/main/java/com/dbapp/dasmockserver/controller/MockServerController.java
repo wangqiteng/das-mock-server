@@ -30,11 +30,15 @@ public class MockServerController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("serviceName") String serviceName,
             @RequestParam(value = "description", required = false) String description,
-            @RequestParam(value = "port", defaultValue = "8081") Integer port) {
+            @RequestParam(value = "port", defaultValue = "8081") Integer port,
+            @RequestParam(value = "aiModel", defaultValue = "qwen-turbo") String aiModel,
+            @RequestParam(value = "aiTemperature", defaultValue = "0.1") Double aiTemperature,
+            @RequestParam(value = "aiMaxTokens", defaultValue = "4000") Integer aiMaxTokens,
+            @RequestParam(value = "aiTopP", defaultValue = "0.7") Double aiTopP) {
         
         try {
             MockService mockService = mockServerService.generateMockServiceFromDocument(
-                file, serviceName, description, port);
+                file, serviceName, description, port, aiModel, aiTemperature, aiMaxTokens, aiTopP);
             return ResponseEntity.ok(mockService);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();

@@ -1,7 +1,9 @@
 package com.dbapp.dasmockserver.controller;
 
+import com.dbapp.dasmockserver.config.AiConfig;
 import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
+import com.dbapp.dasmockserver.service.AiConfigService;
 import com.dbapp.dasmockserver.service.MockServerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -10,21 +12,23 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 public class WebController {
     
     @Autowired
     private MockServerService mockServerService;
+    
+    @Autowired
+    private AiConfigService aiConfigService;
     
     /**
      * 首页
@@ -160,5 +164,97 @@ public class WebController {
         }
         
         return zipPath;
+    }
+    
+    /**
+     * 获取当前AI模型配置
+     */
+    @GetMapping("/api/ai-config")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getAiConfig() {
+        try {
+            AiConfig.AiModelConfig currentConfig = aiConfigService.getCurrentConfig();
+            List<AiConfigService.ModelInfo> availableModels = aiConfigService.getAvailableModels();
+            
+            Map<String, Object> response = Map.of(
+                "currentConfig", currentConfig,
+                "availableModels", availableModels,
+                "configSource", aiConfigService.getConfigSource(),
+                "isDynamic", aiConfigService.isUsingDynamicConfig()
+            );
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * 更新AI模型配置
+     */
+    @PostMapping("/api/ai-config")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> updateAiConfig(@RequestBody AiConfig.AiModelConfig config) {
+        try {
+            // 验证配置参数
+            if (!aiConfigService.validateConfig(config)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "配置参数无效"));
+            }
+            
+            // 实时更新配置
+            boolean success = aiConfigService.updateConfig(config);
+            
+            if (success) {
+                Map<String, Object> response = Map.of(
+                    "message", "配置已实时更新，立即生效",
+                    "config", config,
+                    "source", aiConfigService.getConfigSource()
+                );
+                
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("error", "配置更新失败"));
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * 重置AI配置为默认值
+     */
+    @PostMapping("/api/ai-config/reset")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> resetAiConfig() {
+        try {
+            aiConfigService.resetToDefault();
+            
+            AiConfig.AiModelConfig currentConfig = aiConfigService.getCurrentConfig();
+            
+            Map<String, Object> response = Map.of(
+                "message", "配置已重置为默认值",
+                "config", currentConfig,
+                "source", aiConfigService.getConfigSource()
+            );
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * 获取默认AI配置
+     */
+    @GetMapping("/api/ai-config/default")
+    @ResponseBody
+    public ResponseEntity<AiConfig.AiModelConfig> getDefaultAiConfig() {
+        try {
+            AiConfig.AiModelConfig defaultConfig = aiConfigService.getDefaultConfig();
+            return ResponseEntity.ok(defaultConfig);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 } 

@@ -5,6 +5,7 @@ import com.dbapp.dasmockserver.model.MockService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.squareup.javapoet.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import jakarta.validation.constraints.NotNull;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+@Slf4j
 @Service
 public class CodeGenerationService {
     
@@ -555,8 +557,8 @@ public class CodeGenerationService {
             
         } catch (Exception e) {
             // 如果解析失败，记录错误并返回空列表
-            System.err.println("解析AI Schema失败: " + e.getMessage());
-            System.err.println("原始Schema内容: " + schema);
+            log.error("解析AI Schema失败: {}", e.getMessage());
+            log.error("原始Schema内容: {}", schema);
             e.printStackTrace();
         }
         
@@ -1381,7 +1383,7 @@ public class CodeGenerationService {
                 return parameterInfo;
             } catch (Exception e) {
                 // 如果解析失败，回退到旧的方式
-                System.err.println("解析参数信息失败，使用默认方式: " + e.getMessage());
+                log.error("解析参数信息失败，使用默认方式: {}", e.getMessage());
             }
         }
         
