@@ -65,20 +65,7 @@ public class AiCodeGenerationService {
         return parseApiEndpointsFromAiResponse(aiResponse, mockService);
     }
     
-    /**
-     * 生成完整的Mock Server代码
-     */
-    public String generateMockServerCode(MockService mockService, List<ApiEndpoint> endpoints) {
-        if (chatClient == null) {
-            // 如果没有配置AI，返回默认代码
-            return generateDefaultMockServerCode(mockService, endpoints);
-        }
-        
-        String prompt = buildCodeGenerationPrompt(mockService, endpoints);
-        
-        // 使用动态配置调用AI
-        return callAiWithDynamicConfig(prompt);
-    }
+
     
     /**
      * 为单个端点生成Mock响应
@@ -104,58 +91,56 @@ public class AiCodeGenerationService {
     private String buildApiAnalysisPrompt(String documentContent) {
         return String.format("""
             请分析以下API文档内容，提取所有API端点信息。请以JSON格式返回结果，格式如下：
-            [
-                {
-                    "name": "端点名称",
-                    "path": "/api/endpoint",
-                    "method": "GET|POST|PUT|DELETE|PATCH",
-                    "description": "端点描述",
-                    "requestSchema": {
-                        "pathVariables": [
-                            {
-                                "name": "参数名",
-                                "type": "string|integer|boolean",
-                                "required": true|false,
-                                "description": "参数描述"
-                            }
-                        ],
-                        "queryParameters": [
-                            {
-                                "name": "参数名",
-                                "type": "string|integer|boolean",
-                                "required": true|false,
-                                "description": "参数描述"
-                            }
-                        ],
-                        "requestBody": {
-                            // 格式1: array类型
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "fieldName": {
-                                        "type": "string|integer|boolean|array|object",
-                                        "required": true|false,
-                                        "description": "字段描述"
-                                    }
+            {
+                "name": "端点名称",
+                "path": "/api/endpoint",
+                "method": "GET|POST|PUT|DELETE|PATCH",
+                "description": "端点描述",
+                "requestSchema": {
+                    "pathVariables": [
+                        {
+                            "name": "参数名",
+                            "type": "string|integer|boolean",
+                            "required": true|false,
+                            "description": "参数描述"
+                        }
+                    ],
+                    "queryParameters": [
+                        {
+                            "name": "参数名",
+                            "type": "string|integer|boolean",
+                            "required": true|false,
+                            "description": "参数描述"
+                        }
+                    ],
+                    "requestBody": {
+                        // 格式1: array类型
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "fieldName": {
+                                    "type": "string|integer|boolean|array|object",
+                                    "required": true|false,
+                                    "description": "字段描述"
                                 }
                             }
-                            // 格式2: object类型
-                            // "type": "object",
-                            // "properties": {
-                            //     "fieldName": {
-                            //         "type": "string|integer|boolean|array|object",
-                            //         "required": true|false,
-                            //         "description": "字段描述"
-                            //     }
-                            // }
                         }
-                    },
-                    "responseSchema": {
-                        // 响应参数JSON Schema
+                        // 格式2: object类型
+                        // "type": "object",
+                        // "properties": {
+                        //     "fieldName": {
+                        //         "type": "string|integer|boolean|array|object",
+                        //         "required": true|false,
+                        //         "description": "字段描述"
+                        //     }
+                        // }
                     }
+                },
+                "responseSchema": {
+                    // 响应参数JSON Schema
                 }
-            ]
+            }
             
             文档内容：
             %s
@@ -1221,76 +1206,7 @@ public class AiCodeGenerationService {
         }
     }
     
-    /**
-     * 优化AI生成的代码
-     */
-    public String optimizeGeneratedCode(String generatedCode) {
-        if (chatClient == null) {
-            return generatedCode; // 如果没有AI，直接返回原代码
-        }
-        
-        String prompt = String.format("""
-            请优化以下Spring Boot代码，确保：
-            1. 代码风格符合Java规范
-            2. 添加必要的注释
-            3. 优化性能
-            4. 增强安全性
-            5. 改进错误处理
-            
-            代码：
-            %s
-            
-            请返回优化后的完整代码。
-            """, generatedCode);
-        
-        return chatClient.prompt().user(prompt).call().content();
-    }
-    
-    /**
-     * 生成测试代码
-     */
-    public String generateTestCode(MockService mockService, List<ApiEndpoint> endpoints) {
-        if (chatClient == null) {
-            return String.format("""
-                // 默认测试代码
-                // 服务名称: %s
-                // 端口: %d
-                // 端点数量: %d
-                """, 
-                mockService.getName(),
-                mockService.getPort(),
-                endpoints.size()
-            );
-        }
-        
-        String prompt = String.format("""
-            请为以下Mock Server生成完整的测试代码：
-            
-            服务信息：
-            - 名称: %s
-            - 端口: %d
-            
-            API端点：
-            %s
-            
-            请生成：
-            1. 集成测试类
-            2. 单元测试类
-            3. 测试配置文件
-            
-            要求：
-            1. 使用JUnit 5和Spring Boot Test
-            2. 测试所有端点
-            3. 验证响应格式
-            4. 包含边界条件测试
-            """, 
-            mockService.getName(),
-            mockService.getPort(),
-            endpoints.toString()
-        );
-        
-        return chatClient.prompt().user(prompt).call().content();
-    }
+
 
     /**
      * 使用动态配置调用AI

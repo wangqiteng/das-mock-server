@@ -225,7 +225,8 @@
             <div class="col-md-8">
                 <div class="d-flex align-items-center mb-3">
                     <h2 class="mb-0" th:text="${service.name}">服务名称</h2>
-                    <span th:class="${'badge ms-3 ' + 
+                    <span class="status-badge"
+                          th:class="${'badge ms-3 status-badge ' + 
                         (service.status == 'RUNNING' ? 'bg-success' : 
                          service.status == 'STOPPED' ? 'bg-secondary' : 
                          service.status == 'ERROR' ? 'bg-danger' : 'bg-warning')}"

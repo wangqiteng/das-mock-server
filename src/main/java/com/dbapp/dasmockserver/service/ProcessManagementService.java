@@ -254,21 +254,4 @@ public class ProcessManagementService {
         processIds.remove(serviceId);
         processLogs.remove(serviceId);
     }
-    
-    /**
-     * 获取所有运行中的服务ID
-     */
-    public java.util.Set<Long> getRunningServiceIds() {
-        return runningProcesses.keySet();
-    }
-    
-    /**
-     * 停止所有运行中的服务
-     */
-    public void stopAllServices() {
-        log.info("停止所有运行中的Mock Server");
-        for (Long serviceId : runningProcesses.keySet()) {
-            stopMockServer(serviceId);
-        }
-    }
 } 

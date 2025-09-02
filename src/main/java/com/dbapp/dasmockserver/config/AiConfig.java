@@ -83,5 +83,11 @@ public class AiConfig {
         
         public Double getTopP() { return topP; }
         public void setTopP(Double topP) { this.topP = topP; }
+        
+        @Override
+        public String toString() {
+            return String.format("AiModelConfig{modelName='%s', temperature=%.1f, maxTokens=%d, topP=%.1f}", 
+                modelName, temperature, maxTokens, topP);
+        }
     }
 }
