@@ -298,6 +298,9 @@
             </div>
         </div>
 
+        <!-- 隐藏字段，供JavaScript使用 -->
+        <input type="hidden" id="serviceBaseUrl" th:value="${service.baseUrl}" />
+
         <!-- API端点列表 -->
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -816,7 +819,8 @@
         }
         
         function testEndpoint(path, method) {
-            document.getElementById('testUrl').value = `http://localhost:[[${service.port}]]${path}`;
+            const baseUrl = document.getElementById('serviceBaseUrl').value;
+            document.getElementById('testUrl').value = `${baseUrl}${path}`;
             document.getElementById('testMethod').value = method;
             document.getElementById('testResponse').textContent = '点击测试按钮发送请求...';
             

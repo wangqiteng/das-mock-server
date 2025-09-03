@@ -111,13 +111,13 @@
                                     <div class="mb-3">
                                         <label for="endpointMethod" class="form-label fw-bold">HTTP方法</label>
                                         <select class="form-select" id="endpointMethod" required>
-                                            <option value="GET" th:selected="${endpoint.method == 'GET'}">GET</option>
-                                            <option value="POST" th:selected="${endpoint.method == 'POST'}">POST</option>
-                                            <option value="PUT" th:selected="${endpoint.method == 'PUT'}">PUT</option>
-                                            <option value="DELETE" th:selected="${endpoint.method == 'DELETE'}">DELETE</option>
-                                            <option value="PATCH" th:selected="${endpoint.method == 'PATCH'}">PATCH</option>
-                                            <option value="HEAD" th:selected="${endpoint.method == 'HEAD'}">HEAD</option>
-                                            <option value="OPTIONS" th:selected="${endpoint.method == 'OPTIONS'}">OPTIONS</option>
+                                            <option value="GET" th:selected="${endpoint.method.name() == 'GET'}">GET</option>
+                                            <option value="POST" th:selected="${endpoint.method.name() == 'POST'}">POST</option>
+                                            <option value="PUT" th:selected="${endpoint.method.name() == 'PUT'}">PUT</option>
+                                            <option value="DELETE" th:selected="${endpoint.method.name() == 'DELETE'}">DELETE</option>
+                                            <option value="PATCH" th:selected="${endpoint.method.name() == 'PATCH'}">PATCH</option>
+                                            <option value="HEAD" th:selected="${endpoint.method.name() == 'HEAD'}">HEAD</option>
+                                            <option value="OPTIONS" th:selected="${endpoint.method.name() == 'OPTIONS'}">OPTIONS</option>
                                         </select>
                                     </div>
                                     

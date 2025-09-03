@@ -1,9 +1,11 @@
 package com.dbapp.dasmockserver.service;
 
+import com.dbapp.dasmockserver.config.AiConfig;
 import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.repository.ApiEndpointRepository;
 import com.dbapp.dasmockserver.repository.MockServiceRepository;
+import com.dbapp.dasmockserver.util.NetworkUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +41,9 @@ public class MockServerService {
     
     @Autowired
     private ProcessManagementService processManagementService;
+    
+    @Autowired
+    private NetworkUtil networkUtil;
     
     /**
      * 创建新的Mock服务
@@ -95,7 +103,7 @@ public class MockServerService {
             // 生成代码项目
             String projectPath = codeGenerationService.generateMockServerProject(mockService, endpoints);
             mockService.setProjectPath(projectPath);
-            mockService.setBaseUrl("http://localhost:" + port);
+            mockService.setBaseUrl(networkUtil.buildServiceUrl(port));
             log.info("Mock服务生成成功，项目路径: {},访问路径: {}", projectPath,mockService.getBaseUrl());
             mockService.setStatus(MockService.ServiceStatus.CREATED);
             mockServiceRepository.save(mockService);
