@@ -11,12 +11,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 @Service
 @Slf4j
@@ -27,6 +38,16 @@ public class AiCodeGenerationService {
     
     @Autowired
     private AiConfigService aiConfigService;
+
+    @Value("${hengNao.switch:false}")
+    private Boolean hengNaoSwitch;
+
+    @Value("${hengNao.key:}")
+    private String appKey;
+
+    @Value("${hengNao.secret:}")
+    private String secret;
+
     
     private final ObjectMapper objectMapper = new ObjectMapper();
     
@@ -52,8 +73,16 @@ public class AiCodeGenerationService {
      * 使用AI分析文档并生成API端点信息
      */
     public List<ApiEndpoint> generateApiEndpoints(String documentContent, MockService mockService) {
+
+        // 如果有恒脑配置，则使用恒脑配置
+        if (hengNaoSwitch) {
+            String prompt = buildApiAnalysisPrompt(documentContent);
+            String aiResponse = callHengNaoAi(prompt);
+            return parseApiEndpointsFromHengNaoAiResponse(aiResponse, mockService);
+        }
+
+        // 如果没有AI相关配置，返回空
         if (chatClient == null) {
-            // 如果没有配置AI，返回空列表
             return List.of();
         }
         
@@ -64,9 +93,179 @@ public class AiCodeGenerationService {
         
         return parseApiEndpointsFromAiResponse(aiResponse, mockService);
     }
-    
 
-    
+
+    /**
+     * 调用恒脑接口
+     * @param prompt
+     * @return
+     */
+    private String callHengNaoAi(String prompt) {
+
+        // 如果没有配置Spring Alibaba AI，使用恒脑配置
+
+        // 生成签名
+        String sign = getSign(appKey, secret);
+
+        prompt = prompt.replaceAll("\\\\", "").replaceAll("\"","").replaceAll("\n","").replaceAll("\r","");
+        String jsonBody = "{\"message\":[{\"role\":\"user\",\"content\":\"" + prompt + "\"}]}";
+
+        // 构建HTTP请求
+        // 创建HTTP客户端
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://www.das-ai.com/open/api/v1/chat"))
+                .header("appKey", appKey)
+                .header("sign", sign)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+
+        // 发送请求并获取响应
+        try {
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if(response.statusCode() == 200){
+                return response.body();
+            }else{
+                log.error("恒脑AI调用失败，状态码:{}，响应内容: {}",response.statusCode(), response.body());
+                return "";
+            }
+
+        } catch (Exception e) {
+            log.error("恒脑AI调用失败: {}", e.getMessage(), e);
+            return "";
+        }
+    }
+
+    private List<ApiEndpoint> parseApiEndpointsFromHengNaoAiResponse(String aiResponse, MockService mockService) {
+        List<ApiEndpoint> endpoints = new ArrayList<>();
+
+        if (aiResponse == null || aiResponse.trim().isEmpty()) {
+            log.warn("恒脑AI响应为空，返回空端点列表");
+            return endpoints;
+        }
+        String cleaned = aiResponse.trim();
+        String jsonContent = "";
+        try {
+            // 清理AI响应，提取JSON部分
+            try {
+                JsonNode responseNode = objectMapper.readTree(cleaned);
+
+                // 尝试从result.output.text中提取
+                if (responseNode.has("data") && responseNode.get("data").has("message")
+                 && (responseNode.get("data").get("message").has("content"))) {
+                    JsonNode outputNode = responseNode.get("data").get("message").get("content");
+                    String jsonText = outputNode.asText();
+                    if (jsonText != null && !jsonText.trim().isEmpty()) {
+                        log.info("从result.output.text中提取到JSON，长度: {}", jsonText.length());
+                        log.info("JSON内容预览: {}", jsonText.substring(0, Math.min(100, jsonText.length())));
+                    }
+                    jsonText = jsonText.replaceAll("`", "").replaceAll("\n", "")
+                            .replaceAll("\\\\\"", "'").replaceAll("\\\\","");
+                    jsonContent = jsonText.substring(4);
+                }
+            }catch (Exception e){
+                log.warn("解析失败: {}",e);
+            }
+
+            log.info("提取的JSON内容长度: {}", jsonContent.length());
+
+            // 如果提取的内容为空或太短，尝试直接解析
+            if (jsonContent.length() < 10) {
+                log.warn("提取的JSON内容太短，尝试直接解析原始响应");
+                jsonContent = aiResponse.trim();
+            }
+
+            // 尝试解析JSON数组
+            List<JsonNode> endpointNodes = null;
+
+            // 首先尝试解析为数组
+            try {
+                endpointNodes = objectMapper.readValue(jsonContent, new TypeReference<List<JsonNode>>() {});
+                log.info("成功解析为JSON数组，节点数量: {}", endpointNodes.size());
+            } catch (Exception e) {
+                log.warn("解析JSON数组失败，尝试解析单个对象: {}", e.getMessage());
+
+                // 如果解析数组失败，尝试解析单个对象并包装成数组
+                try {
+                    JsonNode singleNode = objectMapper.readTree(jsonContent);
+                    endpointNodes = List.of(singleNode);
+                    log.info("成功解析为单个对象，包装成数组");
+                } catch (Exception e2) {
+                    log.warn("解析单个对象也失败: {}", e2.getMessage());
+
+                    return List.of();
+                }
+            }
+
+            if (endpointNodes == null || endpointNodes.isEmpty()) {
+                log.warn("解析到的端点节点为空");
+                return endpoints;
+            }
+
+            for (int i = 0; i < endpointNodes.size(); i++) {
+                JsonNode endpointNode = endpointNodes.get(i);
+                try {
+                    ApiEndpoint endpoint = new ApiEndpoint();
+                    endpoint.setMockService(mockService);
+
+                    // 解析基本信息
+                    endpoint.setName(getStringValue(endpointNode, "name", "未命名端点_" + i));
+                    endpoint.setPath(getStringValue(endpointNode, "path", "/api/unknown"));
+                    endpoint.setDescription(getStringValue(endpointNode, "description", ""));
+
+                    // 解析HTTP方法
+                    String methodStr = getStringValue(endpointNode, "method", "GET");
+                    endpoint.setMethod(parseHttpMethod(methodStr));
+
+                    // 解析参数信息（统一使用requestSchema）
+                    JsonNode requestSchema = endpointNode.get("requestSchema");
+                    if (requestSchema != null) {
+                        endpoint.setRequestSchema(requestSchema.toString());
+                    } else {
+                        // 如果没有requestSchema，尝试从其他字段获取
+                        JsonNode parameters = endpointNode.get("parameters");
+                        if (parameters != null) {
+                            endpoint.setRequestSchema(parameters.toString());
+                        } else {
+                            endpoint.setRequestSchema("{}");
+                        }
+                    }
+
+                    // 解析响应Schema
+                    JsonNode responseSchema = endpointNode.get("responseSchema");
+                    if (responseSchema != null) {
+                        endpoint.setResponseSchema(responseSchema.toString());
+                    } else {
+                        endpoint.setResponseSchema("{}");
+                    }
+
+                    // 设置默认值
+                    endpoint.setMockResponse("{}");
+                    endpoint.setResponseDelay(0);
+                    endpoint.setStatusCode(200);
+                    endpoint.setHeaders(Map.of()); // 使用空的Map而不是字符串
+
+                    endpoints.add(endpoint);
+                    log.info("成功解析端点: {}", endpoint.getName() + " - " + endpoint.getPath());
+
+                } catch (Exception e) {
+                    log.warn("解析第{}个端点时发生错误: {}", (i + 1), e.getMessage());
+                    // 继续处理下一个端点，不中断整个流程
+                }
+            }
+
+        } catch (Exception e) {
+            // 处理所有异常
+            log.error("解析API端点时发生错误: {}", e.getMessage());
+            e.printStackTrace();
+        }
+
+        log.info("总共解析到 {} 个端点", endpoints.size());
+        return endpoints;
+    }
+
+
     /**
      * 为单个端点生成Mock响应
      */
@@ -1240,6 +1439,21 @@ public class AiCodeGenerationService {
         } catch (Exception e) {
             log.error("AI调用失败: {}", e.getMessage(), e);
             throw new RuntimeException("AI调用失败: " + e.getMessage(), e);
+        }
+    }
+
+    public static String getSign(String key, String secret) {
+        try {
+            long timestamp = System.currentTimeMillis();
+            String data = String.format("%d\n%s\n%s", timestamp, secret, key);
+            Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSHA256.init(secretKeySpec);
+            byte[] sign = hmacSHA256.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return timestamp + java.util.Base64.getEncoder().encodeToString(sign);
+        }catch (Exception e) {
+            log.error("生成恒脑签名异常: {}", e.getMessage(), e);
+            return "";
         }
     }
 } 
