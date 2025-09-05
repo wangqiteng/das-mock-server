@@ -73,9 +73,9 @@ public class AiCodeGenerationService {
      * 使用AI分析文档并生成API端点信息
      */
     public List<ApiEndpoint> generateApiEndpoints(String documentContent, MockService mockService) {
-
+        AiConfig.AiModelConfig config = temporaryConfig.get();
         // 如果有恒脑配置，则使用恒脑配置
-        if (hengNaoSwitch) {
+        if (("hengNao".equals(config.getModelName())) && hengNaoSwitch) {
             String prompt = buildApiAnalysisPrompt(documentContent);
             String aiResponse = callHengNaoAi(prompt);
             return parseApiEndpointsFromHengNaoAiResponse(aiResponse, mockService);
@@ -125,6 +125,7 @@ public class AiCodeGenerationService {
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if(response.statusCode() == 200){
+                log.info("恒脑响应结果：{}" ,response.body());
                 return response.body();
             }else{
                 log.error("恒脑AI调用失败，状态码:{}，响应内容: {}",response.statusCode(), response.body());
@@ -148,25 +149,7 @@ public class AiCodeGenerationService {
         String jsonContent = "";
         try {
             // 清理AI响应，提取JSON部分
-            try {
-                JsonNode responseNode = objectMapper.readTree(cleaned);
-
-                // 尝试从result.output.text中提取
-                if (responseNode.has("data") && responseNode.get("data").has("message")
-                 && (responseNode.get("data").get("message").has("content"))) {
-                    JsonNode outputNode = responseNode.get("data").get("message").get("content");
-                    String jsonText = outputNode.asText();
-                    if (jsonText != null && !jsonText.trim().isEmpty()) {
-                        log.info("从result.output.text中提取到JSON，长度: {}", jsonText.length());
-                        log.info("JSON内容预览: {}", jsonText.substring(0, Math.min(100, jsonText.length())));
-                    }
-                    jsonText = jsonText.replaceAll("`", "").replaceAll("\n", "")
-                            .replaceAll("\\\\\"", "'").replaceAll("\\\\","");
-                    jsonContent = jsonText.substring(4);
-                }
-            }catch (Exception e){
-                log.warn("解析失败: {}",e);
-            }
+            jsonContent = parseHengNaoApiResponse(aiResponse);
 
             log.info("提取的JSON内容长度: {}", jsonContent.length());
 
@@ -265,15 +248,48 @@ public class AiCodeGenerationService {
         return endpoints;
     }
 
+    private String parseHengNaoApiResponse(String aiResponse) throws JsonProcessingException {
+        String jsonContent = "";
+        JsonNode responseNode = objectMapper.readTree(aiResponse);
+
+        // data.message.content中提取
+        if (responseNode.has("data") && responseNode.get("data").has("message")
+                && (responseNode.get("data").get("message").has("content"))) {
+            JsonNode outputNode = responseNode.get("data").get("message").get("content");
+            String jsonText = outputNode.asText();
+            if (jsonText != null && !jsonText.trim().isEmpty()) {
+                log.info("从data.message.content中提取到JSON，长度: {}", jsonText.length());
+                log.info("JSON内容预览: {}", jsonText.substring(0, Math.min(100, jsonText.length())));
+            }
+            jsonText = jsonText.replaceAll("`", "").replaceAll("\n", "")
+                    .replaceAll("\\\\\"", "'").replaceAll("\\\\","");
+            jsonContent = jsonText.substring(4);
+        }
+        return jsonContent;
+    }
+
 
     /**
      * 为单个端点生成Mock响应
      */
-    public String generateMockResponse(ApiEndpoint endpoint) {
+    public String generateMockResponse(ApiEndpoint endpoint) throws JsonProcessingException {
+        // 如果有恒脑配置，则使用恒脑配置
+        if (hengNaoSwitch) {
+            String prompt = buildMockResponsePrompt(endpoint);
+
+            // 使用动态配置调用AI
+            String response = callHengNaoAi(prompt);
+
+            // 清理响应，移除markdown格式
+            return parseHengNaoApiResponse(response);
+        }
+
+        // 如果没有AI相关配置，返回空
         if (chatClient == null) {
             // 如果没有配置AI，返回默认响应
             return generateDefaultMockResponse(endpoint);
         }
+
         
         String prompt = buildMockResponsePrompt(endpoint);
         
