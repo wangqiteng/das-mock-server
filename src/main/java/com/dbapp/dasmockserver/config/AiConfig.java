@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class AiConfig {
-    private static final String DEFAULT_PROMPT = "你是一个根据接口文档生成接口服务的助手，请根据用户提问生成相关代码！";
+    public static final String DEFAULT_PROMPT = "你是一个根据接口文档生成接口服务的助手，请根据用户提问生成相关代码！";
     
     @Value("${spring.ai.alibaba.dashscope.chat.options.model:qwen-turbo}")
     private String modelName;

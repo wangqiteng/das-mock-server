@@ -1,5 +1,6 @@
 package com.dbapp.dasmockserver.service;
 
+import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.dbapp.dasmockserver.config.AiConfig;
 import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+
+import static com.dbapp.dasmockserver.config.AiConfig.DEFAULT_PROMPT;
 
 @Service
 @Slf4j
@@ -1443,7 +1447,13 @@ public class AiCodeGenerationService {
                 config.getTopP(), configSource);
             
             // 调用AI并返回结果
-            String result = chatClient.prompt().user(prompt).call().content();
+            DashScopeChatOptions customOptions = DashScopeChatOptions.builder()
+                    .withTopP(config.getTopP())
+                    .withTemperature(config.getTemperature())
+                    .withModel(config.getModelName())
+                    .withMaxToken(config.getMaxTokens())
+                    .build();
+            String result = chatClient.prompt(new Prompt(DEFAULT_PROMPT,customOptions)).user(prompt).call().content();
             
             // 清除临时配置
             if (temporaryConfig.get() != null) {
