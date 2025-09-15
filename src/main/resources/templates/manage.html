@@ -10,7 +10,7 @@
         .hero-section {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 60px 0;
+            padding: 30px 0;
         }
         
         .service-card {
@@ -59,9 +59,9 @@
         .stats-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
@@ -88,7 +88,7 @@
         }
         
         .stats-number {
-            font-size: 2rem;
+            font-size: 1.5rem;
             font-weight: bold;
             transition: all 0.3s ease;
         }
@@ -98,7 +98,7 @@
         }
         
         .stats-label {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             opacity: 0.9;
         }
         
@@ -323,6 +323,48 @@
                 transform: none;
             }
         }
+        
+        /* 小尺寸表单控件优化 */
+        .form-label-sm {
+            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .form-control-sm, .form-select-sm {
+            font-size: 0.85rem;
+        }
+        
+        /* 分页组件优化 */
+        .pagination-sm .page-link {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.85rem;
+        }
+        
+        /* 跳转页码输入框样式 */
+        #jumpToPage {
+            text-align: center;
+        }
+        
+        /* 搜索区域紧凑布局 */
+        .card-body.py-2 {
+            padding-top: 0.75rem !important;
+            padding-bottom: 0.75rem !important;
+        }
+        
+        /* 统计卡片响应式优化 */
+        @media (max-width: 576px) {
+            .stats-card {
+                margin-bottom: 0.5rem;
+            }
+            
+            .stats-number {
+                font-size: 1.25rem;
+            }
+            
+            .stats-label {
+                font-size: 0.75rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -360,36 +402,36 @@
     <!-- 页面标题 -->
     <section class="hero-section fade-in">
         <div class="container text-center">
-            <h1 class="display-5 mb-2">
-                <i class="fas fa-cogs me-3"></i>服务管理
-            </h1>
-            <p class="lead">管理和监控您的Mock Server服务</p>
+            <h3 class="mb-1">
+                <i class="fas fa-cogs me-2"></i>服务管理
+            </h3>
+            <p class="mb-0">管理和监控您的Mock Server服务</p>
         </div>
     </section>
 
     <!-- 统计信息 -->
-    <section class="py-3 fade-in">
+    <section class="py-2 fade-in">
         <div class="container">
             <div class="row">
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
                     <div class="stats-card text-center">
                         <div class="stats-number" th:text="${#lists.size(services)}">0</div>
                         <div class="stats-label">总服务数</div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
                     <div class="stats-card text-center">
                         <div class="stats-number" th:text="${#lists.size(services.?[status == 'RUNNING'])}">0</div>
                         <div class="stats-label">运行中</div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
                     <div class="stats-card text-center">
                         <div class="stats-number" th:text="${#lists.size(services.?[status == 'STOPPED'])}">0</div>
                         <div class="stats-label">已停止</div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
                     <div class="stats-card text-center">
                         <div class="stats-number" th:text="${#lists.size(services.?[status == 'ERROR'])}">0</div>
                         <div class="stats-label">错误状态</div>
@@ -400,13 +442,65 @@
     </section>
 
     <!-- 服务管理 -->
-    <section class="py-4 fade-in">
+    <section class="py-2 fade-in">
         <div class="container">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2>服务列表</h2>
-                <a href="/upload" class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>新建服务
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="mb-0">服务列表</h4>
+                <a href="/upload" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>新建服务
                 </a>
+            </div>
+            
+            <!-- 搜索和过滤区域 -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body py-2">
+                            <form id="searchForm" class="row g-2 align-items-end">
+                                <div class="col-lg-3 col-md-4">
+                                    <label for="searchKeyword" class="form-label form-label-sm">关键词</label>
+                                    <input type="text" class="form-control form-control-sm" id="searchKeyword" name="keyword" 
+                                           placeholder="服务名称或标签...">
+                                </div>
+                                <div class="col-lg-2 col-md-3">
+                                    <label for="statusFilter" class="form-label form-label-sm">状态</label>
+                                    <select class="form-select form-select-sm" id="statusFilter" name="status">
+                                        <option value="">全部状态</option>
+                                        <option value="RUNNING">运行中</option>
+                                        <option value="STOPPED">已停止</option>
+                                        <option value="ERROR">错误状态</option>
+                                        <option value="CREATED">已创建</option>
+                                    </select>
+                                </div>
+                                <div class="col-lg-2 col-md-3">
+                                    <label for="tagFilter" class="form-label form-label-sm">标签</label>
+                                    <select class="form-select form-select-sm" id="tagFilter" name="tag">
+                                        <option value="">全部标签</option>
+                                        <!-- 标签选项将通过JavaScript动态加载 -->
+                                    </select>
+                                </div>
+                                <div class="col-lg-3 col-md-4">
+                                    <div class="d-flex gap-1">
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-search me-1"></i>搜索
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" id="clearSearchBtn">
+                                            <i class="fas fa-times me-1"></i>清除
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-lg-1 col-md-2">
+                                    <select class="form-select form-select-sm" id="pageSize" title="每页显示条数">
+                                        <option value="10">10条</option>
+                                        <option value="20" selected>20条</option>
+                                        <option value="50">50条</option>
+                                        <option value="100">100条</option>
+                                    </select>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div th:if="${#lists.isEmpty(services)}" class="text-center py-5">
@@ -421,6 +515,7 @@
                     <thead>
                         <tr>
                             <th>服务名称</th>
+                            <th>标签</th>
                             <th>状态</th>
                             <th>端口</th>
                             <th>创建时间</th>
@@ -441,6 +536,15 @@
                                         <small class="text-muted" th:text="${service.description}">服务描述</small>
                                     </div>
                                 </div>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1" th:if="${service.tags != null and !#strings.isEmpty(service.tags)}">
+                                    <span th:each="tag : ${#strings.arraySplit(service.tags, ',')}" 
+                                          class="badge bg-light text-dark border" 
+                                          th:text="${#strings.trim(tag)}">标签</span>
+                                </div>
+                                <span th:if="${service.tags == null or #strings.isEmpty(service.tags)}" 
+                                      class="text-muted">无标签</span>
                             </td>
                             <td>
                                 <span th:class="${'badge status-badge ' + 
@@ -495,6 +599,34 @@
                     </tbody>
                 </table>
             </div>
+            
+            <!-- 分页组件 -->
+            <div th:if="${!#lists.isEmpty(services)}" class="mt-3">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <div class="text-muted small">
+                            <span id="paginationInfo">显示第 1-20 条，共 0 条记录</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="d-flex align-items-center justify-content-center">
+                            <label class="form-label me-2 mb-0 small">跳转到</label>
+                            <input type="number" class="form-control form-control-sm me-2" id="jumpToPage" 
+                                   style="width: 80px;" min="1" placeholder="页码">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="jumpToPageBtn">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <nav aria-label="服务分页" class="d-flex justify-content-end">
+                            <ul class="pagination pagination-sm mb-0" id="pagination">
+                                <!-- 分页按钮将通过JavaScript动态生成 -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -547,11 +679,24 @@
 
     <script src="/js/bootstrap.bundle.min.js"></script>
     <script>
+        // 全局变量
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalPages = 1;
+        let totalElements = 0;
+        let currentFilters = {
+            keyword: '',
+            status: '',
+            tag: ''
+        };
+
         // 页面加载完成后初始化统计信息和按钮状态
         document.addEventListener('DOMContentLoaded', function() {
             updateStats();
             initializeEventListeners();
             checkServiceStatuses();
+            loadTags();
+            initializePagination();
         });
         
         // 初始化服务按钮状态
@@ -631,6 +776,49 @@
                     }
                 }
             });
+
+            // 清除搜索条件按钮事件
+            const clearSearchBtn = document.getElementById('clearSearchBtn');
+            if (clearSearchBtn) {
+                clearSearchBtn.addEventListener('click', function() {
+                    // 清空搜索表单
+                    document.getElementById('searchKeyword').value = '';
+                    document.getElementById('statusFilter').value = '';
+                    document.getElementById('tagFilter').value = '';
+                    
+                    // 重置过滤条件
+                    currentFilters = {
+                        keyword: '',
+                        status: '',
+                        tag: ''
+                    };
+                    
+                    // 重置到第一页并重新加载
+                    currentPage = 1;
+                    loadServices();
+                });
+            }
+
+            // 跳转页码按钮事件
+            const jumpToPageBtn = document.getElementById('jumpToPageBtn');
+            const jumpToPageInput = document.getElementById('jumpToPage');
+            if (jumpToPageBtn && jumpToPageInput) {
+                jumpToPageBtn.addEventListener('click', function() {
+                    const targetPage = parseInt(jumpToPageInput.value);
+                    if (targetPage && targetPage >= 1 && targetPage <= totalPages) {
+                        goToPage(targetPage);
+                        jumpToPageInput.value = '';
+                    } else {
+                        showToast('warning', '提示', `请输入有效的页码 (1-${totalPages})`);
+                    }
+                });
+
+                jumpToPageInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        jumpToPageBtn.click();
+                    }
+                });
+            }
         }
         
         // 检查服务状态
@@ -970,6 +1158,268 @@
                 statsNumbers[2].textContent = stopped;
                 statsNumbers[3].textContent = error;
             }
+        }
+        
+        // 加载标签选项
+        async function loadTags() {
+            try {
+                const response = await fetch('/api/mock-server/tags');
+                if (response.ok) {
+                    const data = await response.json();
+                    const tagSelect = document.getElementById('tagFilter');
+                    
+                    // 清空现有选项（保留"全部标签"选项）
+                    tagSelect.innerHTML = '<option value="">全部标签</option>';
+                    
+                    // 添加标签选项
+                    if (data.success && data.tags) {
+                        data.tags.forEach(tag => {
+                            const option = document.createElement('option');
+                            option.value = tag;
+                            option.textContent = tag;
+                            tagSelect.appendChild(option);
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('加载标签失败:', error);
+            }
+        }
+        
+        // 初始化分页
+        function initializePagination() {
+            const pageSizeSelect = document.getElementById('pageSize');
+            pageSizeSelect.addEventListener('change', function() {
+                pageSize = parseInt(this.value);
+                currentPage = 1;
+                loadServices();
+            });
+            
+            // 初始化搜索表单
+            const searchForm = document.getElementById('searchForm');
+            searchForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                currentPage = 1;
+                currentFilters.keyword = document.getElementById('searchKeyword').value;
+                currentFilters.status = document.getElementById('statusFilter').value;
+                currentFilters.tag = document.getElementById('tagFilter').value;
+                loadServices();
+            });
+        }
+        
+        // 加载服务数据
+        async function loadServices() {
+            try {
+                const params = new URLSearchParams({
+                    page: currentPage - 1,
+                    size: pageSize,
+                    keyword: currentFilters.keyword,
+                    status: currentFilters.status,
+                    tag: currentFilters.tag
+                });
+                
+                const response = await fetch(`/api/mock-server/services?${params}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateServiceTable(data);
+                    updatePagination(data);
+                } else {
+                    showToast('error', '加载失败', '无法加载服务列表');
+                }
+            } catch (error) {
+                console.error('加载服务失败:', error);
+                showToast('error', '加载错误', '加载服务列表时发生错误');
+            }
+        }
+        
+        // 更新服务表格
+        function updateServiceTable(data) {
+            const tbody = document.querySelector('tbody');
+            tbody.innerHTML = '';
+            
+            if (data.content && data.content.length > 0) {
+                data.content.forEach(service => {
+                    const row = createServiceRow(service);
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <i class="fas fa-search fa-2x text-muted mb-2"></i>
+                            <div class="text-muted">没有找到符合条件的服务</div>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            // 重新初始化事件监听器
+            initializeEventListeners();
+            checkServiceStatuses();
+        }
+        
+        // 创建服务行
+        function createServiceRow(service) {
+            const row = document.createElement('tr');
+            row.className = 'service-row';
+            row.setAttribute('data-service-id', service.id);
+            row.style.cursor = 'pointer';
+            
+            // 状态徽章样式
+            const statusClass = service.status === 'RUNNING' ? 'bg-success' : 
+                              service.status === 'STOPPED' ? 'bg-secondary' : 
+                              service.status === 'ERROR' ? 'bg-danger' : 'bg-warning';
+            
+            // 标签HTML
+            let tagsHtml = '';
+            if (service.tags && service.tags.trim()) {
+                const tags = service.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+                tagsHtml = tags.map(tag => `<span class="badge bg-light text-dark border">${tag}</span>`).join(' ');
+            } else {
+                tagsHtml = '<span class="text-muted">无标签</span>';
+            }
+            
+            row.innerHTML = `
+                <td>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-server text-primary me-2"></i>
+                        <div>
+                            <div class="fw-bold service-name">${service.name}</div>
+                            <small class="text-muted">${service.description || ''}</small>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex flex-wrap gap-1">${tagsHtml}</div>
+                </td>
+                <td>
+                    <span class="badge status-badge ${statusClass}">${service.status}</span>
+                </td>
+                <td><code>${service.port}</code></td>
+                <td><small>${formatDate(service.createdAt)}</small></td>
+                <td><small>${formatDate(service.updatedAt)}</small></td>
+                <td>
+                    <div class="action-buttons" onclick="event.stopPropagation();">
+                        <a href="/service/${service.id}" class="btn btn-sm btn-outline-primary me-1">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        ${service.status === 'RUNNING' ? 
+                            `<button data-service-id="${service.id}" data-action="stop" class="btn btn-sm btn-outline-warning me-1 action-btn" onclick="stopService(${service.id})">
+                                <i class="fas fa-stop"></i>
+                            </button>` :
+                            `<button data-service-id="${service.id}" data-action="start" class="btn btn-sm btn-outline-success me-1 action-btn" onclick="startService(${service.id})">
+                                <i class="fas fa-play"></i>
+                            </button>`
+                        }
+                        <button data-service-id="${service.id}" data-action="regenerate" class="btn btn-sm btn-outline-info me-1 action-btn" onclick="showConfirmDialog('fas fa-sync', '重新生成服务', '确定要重新生成这个Mock服务吗？这将覆盖现有的代码。', () => regenerateService(${service.id}))">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                        <button data-service-id="${service.id}" data-action="delete" class="btn btn-sm btn-outline-danger action-btn" onclick="showConfirmDialog('fas fa-trash', '删除服务', '确定要删除这个Mock服务吗？此操作不可恢复。', () => deleteService(${service.id}))">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            
+            return row;
+        }
+        
+        // 更新分页组件
+        function updatePagination(data) {
+            totalPages = data.totalPages || 1;
+            totalElements = data.totalElements || 0;
+            
+            const pagination = document.getElementById('pagination');
+            const paginationInfo = document.getElementById('paginationInfo');
+            const jumpToPageInput = document.getElementById('jumpToPage');
+            
+            // 更新分页信息
+            const start = totalElements > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+            const end = Math.min(currentPage * pageSize, totalElements);
+            paginationInfo.textContent = `显示第 ${start}-${end} 条，共 ${totalElements} 条记录`;
+            
+            // 更新跳转页码输入框的最大值
+            if (jumpToPageInput) {
+                jumpToPageInput.setAttribute('max', totalPages);
+                jumpToPageInput.placeholder = `1-${totalPages}`;
+            }
+            
+            // 生成分页按钮
+            pagination.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            // 上一页按钮
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${currentPage - 1})" title="上一页"><i class="fas fa-chevron-left"></i></a>`;
+            pagination.appendChild(prevLi);
+            
+            // 页码按钮 - 显示更少的页码以节省空间
+            const startPage = Math.max(1, currentPage - 1);
+            const endPage = Math.min(totalPages, currentPage + 1);
+            
+            if (startPage > 1) {
+                const firstLi = document.createElement('li');
+                firstLi.className = 'page-item';
+                firstLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(1)">1</a>`;
+                pagination.appendChild(firstLi);
+                
+                if (startPage > 2) {
+                    const ellipsisLi = document.createElement('li');
+                    ellipsisLi.className = 'page-item disabled';
+                    ellipsisLi.innerHTML = '<span class="page-link">...</span>';
+                    pagination.appendChild(ellipsisLi);
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageLi = document.createElement('li');
+                pageLi.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                pageLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>`;
+                pagination.appendChild(pageLi);
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const ellipsisLi = document.createElement('li');
+                    ellipsisLi.className = 'page-item disabled';
+                    ellipsisLi.innerHTML = '<span class="page-link">...</span>';
+                    pagination.appendChild(ellipsisLi);
+                }
+                
+                const lastLi = document.createElement('li');
+                lastLi.className = 'page-item';
+                lastLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${totalPages})">${totalPages}</a>`;
+                pagination.appendChild(lastLi);
+            }
+            
+            // 下一页按钮
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${currentPage + 1})" title="下一页"><i class="fas fa-chevron-right"></i></a>`;
+            pagination.appendChild(nextLi);
+        }
+        
+        // 跳转到指定页面
+        function goToPage(page) {
+            if (page >= 1 && page <= totalPages && page !== currentPage) {
+                currentPage = page;
+                loadServices();
+            }
+        }
+        
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
         }
     </script>
 </body>

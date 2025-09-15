@@ -6,6 +6,7 @@ import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.service.AiConfigService;
 import com.dbapp.dasmockserver.service.MockServerService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,8 +36,10 @@ public class WebController {
      */
     @GetMapping("/")
     public String index(Model model) {
-        List<MockService> services = mockServerService.getAllMockServices();
-        model.addAttribute("services", services);
+        // 获取前10个服务用于首页显示
+        Page<MockService> servicesPage = mockServerService.getMockServicesWithFilters(
+            null, null, null, org.springframework.data.domain.PageRequest.of(0, 10));
+        model.addAttribute("services", servicesPage.getContent());
         return "index";
     }
     
@@ -86,8 +89,10 @@ public class WebController {
      */
     @GetMapping("/manage")
     public String manageServices(Model model) {
-        List<MockService> services = mockServerService.getAllMockServices();
-        model.addAttribute("services", services);
+        // 获取所有服务用于管理页面显示
+        Page<MockService> servicesPage = mockServerService.getMockServicesWithFilters(
+            null, null, null, org.springframework.data.domain.PageRequest.of(0, 1000));
+        model.addAttribute("services", servicesPage.getContent());
         return "manage";
     }
     

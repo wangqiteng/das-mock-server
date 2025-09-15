@@ -4,6 +4,9 @@ import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.service.MockServerService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +37,7 @@ public class MockServerController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("serviceName") String serviceName,
             @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "tags", required = false) String tags,
             @RequestParam(value = "port", defaultValue = "8081") Integer port,
             @RequestParam(value = "aiModel", defaultValue = "qwen-turbo") String aiModel,
             @RequestParam(value = "aiTemperature", defaultValue = "0.1") Double aiTemperature,
@@ -42,7 +46,7 @@ public class MockServerController {
         
         try {
             MockService mockService = mockServerService.generateMockServiceFromDocument(
-                file, serviceName, description, port, aiModel, aiTemperature, aiMaxTokens, aiTopP);
+                file, serviceName, description, tags, port, aiModel, aiTemperature, aiMaxTokens, aiTopP);
             return ResponseEntity.ok(mockService);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
@@ -52,12 +56,48 @@ public class MockServerController {
     }
     
     /**
-     * 获取所有Mock服务
+     * 获取所有Mock服务（分页查询）
      */
     @GetMapping("/services")
-    public ResponseEntity<List<MockService>> getAllMockServices() {
-        List<MockService> services = mockServerService.getAllMockServices();
+    public ResponseEntity<Page<MockService>> getAllMockServices(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "tag", required = false) String tag) {
+        
+        Pageable pageable = PageRequest.of(page, size);
+        MockService.ServiceStatus serviceStatus = null;
+        if (status != null && !status.isEmpty()) {
+            try {
+                serviceStatus = MockService.ServiceStatus.valueOf(status);
+            } catch (IllegalArgumentException e) {
+                // 忽略无效的状态值
+            }
+        }
+        
+        Page<MockService> services = mockServerService.getMockServicesWithFilters(
+            keyword, serviceStatus, tag, pageable);
         return ResponseEntity.ok(services);
+    }
+    
+    /**
+     * 获取所有标签
+     */
+    @GetMapping("/tags")
+    public ResponseEntity<Map<String, Object>> getAllTags() {
+        try {
+            List<String> tags = mockServerService.getAllTags();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "tags", tags
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of(
+                "success", false,
+                "message", "获取标签失败: " + e.getMessage()
+            ));
+        }
     }
     
     /**
@@ -203,13 +243,14 @@ public class MockServerController {
     public ResponseEntity<MockService> createMockService(@RequestBody Map<String, Object> request) {
         String name = (String) request.get("name");
         String description = (String) request.get("description");
+        String tags = (String) request.get("tags");
         Integer port = (Integer) request.get("port");
         
         if (name == null || port == null) {
             return ResponseEntity.badRequest().build();
         }
         
-        MockService mockService = mockServerService.createMockService(name, description, port);
+        MockService mockService = mockServerService.createMockService(name, description, tags, port);
         return ResponseEntity.status(HttpStatus.CREATED).body(mockService);
     }
     

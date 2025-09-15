@@ -18,6 +18,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @Transactional
@@ -48,10 +50,11 @@ public class MockServerService {
     /**
      * 创建新的Mock服务
      */
-    public MockService createMockService(String name, String description, Integer port) {
+    public MockService createMockService(String name, String description, String tags, Integer port) {
         MockService mockService = new MockService();
         mockService.setName(name);
         mockService.setDescription(description);
+        mockService.setTags(tags);
         mockService.setPort(port);
         mockService.setStatus(MockService.ServiceStatus.CREATED);
         
@@ -62,7 +65,7 @@ public class MockServerService {
      * 上传文档并生成Mock服务
      */
     public MockService generateMockServiceFromDocument(MultipartFile file, String serviceName, 
-                                                      String description, Integer port,
+                                                      String description, String tags, Integer port,
                                                       String aiModel, Double aiTemperature, 
                                                       Integer aiMaxTokens, Double aiTopP) throws IOException {
         // 验证文件格式
@@ -74,7 +77,7 @@ public class MockServerService {
         String documentContent = documentParserService.parseDocument(file);
         
         // 创建Mock服务
-        MockService mockService = createMockService(serviceName, description, port);
+        MockService mockService = createMockService(serviceName, description, tags, port);
         mockService.setOriginalDocument(documentContent);
         mockService.setDocumentType(getFileExtension(file.getOriginalFilename()));
         mockService.setStatus(MockService.ServiceStatus.GENERATING);
@@ -337,5 +340,28 @@ public class MockServerService {
         
         // 如果没有找到可用端口，返回null
         return null;
+    }
+    
+    /**
+     * 分页查询服务，支持关键词搜索
+     */
+    public Page<MockService> getMockServicesWithFilters(String keyword, MockService.ServiceStatus status, 
+                                                       String tag, Pageable pageable) {
+        return mockServiceRepository.findServicesWithFilters(keyword, status, tag, pageable);
+    }
+    
+    /**
+     * 获取所有标签
+     */
+    public List<String> getAllTags() {
+        List<String> allTags = mockServiceRepository.findAllTags();
+        return allTags.stream()
+                .filter(tags -> tags != null && !tags.trim().isEmpty())
+                .flatMap(tags -> java.util.Arrays.stream(tags.split(",")))
+                .map(String::trim)
+                .filter(tag -> !tag.isEmpty())
+                .distinct()
+                .sorted()
+                .toList();
     }
 } 

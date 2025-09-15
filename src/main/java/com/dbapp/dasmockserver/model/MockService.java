@@ -20,6 +20,9 @@ public class MockService {
     @Column(columnDefinition = "TEXT")
     private String description;
     
+    @Column(columnDefinition = "TEXT")
+    private String tags;
+    
     private String baseUrl;
     
     private Integer port;
@@ -79,6 +82,14 @@ public class MockService {
     
     public void setDescription(String description) {
         this.description = description;
+    }
+    
+    public String getTags() {
+        return tags;
+    }
+    
+    public void setTags(String tags) {
+        this.tags = tags;
     }
     
     public String getBaseUrl() {
