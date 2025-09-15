@@ -365,6 +365,61 @@
                 font-size: 0.75rem;
             }
         }
+        
+        /* 页面滚动条样式 */
+        body {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        
+        /* 主容器滚动支持 */
+        .main-content {
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        /* 表格容器滚动支持 */
+        .table-container {
+            max-height: 60vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        /* 自定义滚动条样式 */
+        .table-container::-webkit-scrollbar,
+        .main-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .table-container::-webkit-scrollbar-track,
+        .main-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .table-container::-webkit-scrollbar-thumb,
+        .main-content::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .table-container::-webkit-scrollbar-thumb:hover,
+        .main-content::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        /* 确保导航栏固定高度 */
+        .navbar {
+            min-height: 56px;
+            max-height: 56px;
+        }
+        
+        /* 页面内容区域 */
+        .page-content {
+            min-height: calc(100vh - 56px);
+            padding-top: 0;
+        }
     </style>
 </head>
 <body>
@@ -399,51 +454,53 @@
         </div>
     </nav>
 
-    <!-- 页面标题 -->
-    <section class="hero-section fade-in">
-        <div class="container text-center">
-            <h3 class="mb-1">
-                <i class="fas fa-cogs me-2"></i>服务管理
-            </h3>
-            <p class="mb-0">管理和监控您的Mock Server服务</p>
-        </div>
-    </section>
+    <!-- 页面内容区域 -->
+    <div class="page-content">
+        <!-- 页面标题 -->
+        <section class="hero-section fade-in">
+            <div class="container text-center">
+                <h3 class="mb-1">
+                    <i class="fas fa-cogs me-2"></i>服务管理
+                </h3>
+                <p class="mb-0">管理和监控您的Mock Server服务</p>
+            </div>
+        </section>
 
-    <!-- 统计信息 -->
-    <section class="py-2 fade-in">
-        <div class="container">
-            <div class="row">
-                <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
-                    <div class="stats-card text-center">
-                        <div class="stats-number" th:text="${#lists.size(services)}">0</div>
-                        <div class="stats-label">总服务数</div>
+        <!-- 统计信息 -->
+        <section class="py-2 fade-in">
+            <div class="container">
+                <div class="row">
+                    <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
+                        <div class="stats-card text-center">
+                            <div class="stats-number" th:text="${#lists.size(services)}">0</div>
+                            <div class="stats-label">总服务数</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
-                    <div class="stats-card text-center">
-                        <div class="stats-number" th:text="${#lists.size(services.?[status == 'RUNNING'])}">0</div>
-                        <div class="stats-label">运行中</div>
+                    <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
+                        <div class="stats-card text-center">
+                            <div class="stats-number" th:text="${#lists.size(services.?[status == 'RUNNING'])}">0</div>
+                            <div class="stats-label">运行中</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
-                    <div class="stats-card text-center">
-                        <div class="stats-number" th:text="${#lists.size(services.?[status == 'STOPPED'])}">0</div>
-                        <div class="stats-label">已停止</div>
+                    <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
+                        <div class="stats-card text-center">
+                            <div class="stats-number" th:text="${#lists.size(services.?[status == 'STOPPED'])}">0</div>
+                            <div class="stats-label">已停止</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
-                    <div class="stats-card text-center">
-                        <div class="stats-number" th:text="${#lists.size(services.?[status == 'ERROR'])}">0</div>
-                        <div class="stats-label">错误状态</div>
+                    <div class="col-lg-3 col-md-6 col-sm-6 mb-2">
+                        <div class="stats-card text-center">
+                            <div class="stats-number" th:text="${#lists.size(services.?[status == 'ERROR'])}">0</div>
+                            <div class="stats-label">错误状态</div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- 服务管理 -->
-    <section class="py-2 fade-in">
-        <div class="container">
+        <!-- 服务管理 -->
+        <section class="py-2 fade-in">
+            <div class="container main-content">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h4 class="mb-0">服务列表</h4>
                 <a href="/upload" class="btn btn-primary btn-sm">
@@ -510,94 +567,96 @@
                 <a href="/upload" class="btn btn-primary">立即开始</a>
             </div>
             
-            <div th:if="${!#lists.isEmpty(services)}" class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>服务名称</th>
-                            <th>标签</th>
-                            <th>状态</th>
-                            <th>端口</th>
-                            <th>创建时间</th>
-                            <th>最后更新</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="service : ${services}" 
-                            th:data-service-id="${service.id}"
-                            class="service-row"
-                            style="cursor: pointer;">
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-server text-primary me-2"></i>
-                                    <div>
-                                        <div class="fw-bold service-name" th:text="${service.name}">服务名称</div>
-                                        <small class="text-muted" th:text="${service.description}">服务描述</small>
+            <div th:if="${!#lists.isEmpty(services)}" class="table-container">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>服务名称</th>
+                                <th>标签</th>
+                                <th>状态</th>
+                                <th>端口</th>
+                                <th>创建时间</th>
+                                <th>最后更新</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="service : ${services}" 
+                                th:data-service-id="${service.id}"
+                                class="service-row"
+                                style="cursor: pointer;">
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-server text-primary me-2"></i>
+                                        <div>
+                                            <div class="fw-bold service-name" th:text="${service.name}">服务名称</div>
+                                            <small class="text-muted" th:text="${service.description}">服务描述</small>
+                                        </div>
                                     </div>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="d-flex flex-wrap gap-1" th:if="${service.tags != null and !#strings.isEmpty(service.tags)}">
-                                    <span th:each="tag : ${#strings.arraySplit(service.tags, ',')}" 
-                                          class="badge bg-light text-dark border" 
-                                          th:text="${#strings.trim(tag)}">标签</span>
-                                </div>
-                                <span th:if="${service.tags == null or #strings.isEmpty(service.tags)}" 
-                                      class="text-muted">无标签</span>
-                            </td>
-                            <td>
-                                <span th:class="${'badge status-badge ' + 
-                                    (service.status == 'RUNNING' ? 'bg-success' : 
-                                     service.status == 'STOPPED' ? 'bg-secondary' : 
-                                     service.status == 'ERROR' ? 'bg-danger' : 'bg-warning')}"
-                                      th:text="${service.status}">状态</span>
-                            </td>
-                            <td>
-                                <code th:text="${service.port}">8080</code>
-                            </td>
-                            <td>
-                                <small th:text="${#temporals.format(service.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 10:00</small>
-                            </td>
-                            <td>
-                                <small th:text="${#temporals.format(service.updatedAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 10:00</small>
-                            </td>
-                            <td>
-                                <div class="action-buttons" onclick="event.stopPropagation();">
-                                    <a th:href="@{'/service/' + ${service.id}}" class="btn btn-sm btn-outline-primary me-1">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <button th:if="${service.status == 'RUNNING'}" 
-                                            th:data-service-id="${service.id}"
-                                            data-action="stop"
-                                            class="btn btn-sm btn-outline-warning me-1 action-btn"
-                                            th:onclick="'stopService(' + ${service.id} + ')'">
-                                        <i class="fas fa-stop"></i>
-                                    </button>
-                                    <button th:if="${service.status != 'RUNNING'}" 
-                                            th:data-service-id="${service.id}"
-                                            data-action="start"
-                                            class="btn btn-sm btn-outline-success me-1 action-btn"
-                                            th:onclick="'startService(' + ${service.id} + ')'">
-                                        <i class="fas fa-play"></i>
-                                    </button>
-                                    <button th:data-service-id="${service.id}"
-                                            data-action="regenerate"
-                                            class="btn btn-sm btn-outline-info me-1 action-btn"
-                                            th:onclick="'showConfirmDialog(\'fas fa-sync\', \'重新生成服务\', \'确定要重新生成这个Mock服务吗？这将覆盖现有的代码。\', () => regenerateService(' + ${service.id} + '))'">
-                                        <i class="fas fa-sync"></i>
-                                    </button>
-                                    <button th:data-service-id="${service.id}"
-                                            data-action="delete"
-                                            class="btn btn-sm btn-outline-danger action-btn"
-                                            th:onclick="'showConfirmDialog(\'fas fa-trash\', \'删除服务\', \'确定要删除这个Mock服务吗？此操作不可恢复。\', () => deleteService(' + ${service.id} + '))'">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-wrap gap-1" th:if="${service.tags != null and !#strings.isEmpty(service.tags)}">
+                                        <span th:each="tag : ${#strings.arraySplit(service.tags, ',')}" 
+                                              class="badge bg-light text-dark border" 
+                                              th:text="${#strings.trim(tag)}">标签</span>
+                                    </div>
+                                    <span th:if="${service.tags == null or #strings.isEmpty(service.tags)}" 
+                                          class="text-muted">无标签</span>
+                                </td>
+                                <td>
+                                    <span th:class="${'badge status-badge ' + 
+                                        (service.status == 'RUNNING' ? 'bg-success' : 
+                                         service.status == 'STOPPED' ? 'bg-secondary' : 
+                                         service.status == 'ERROR' ? 'bg-danger' : 'bg-warning')}"
+                                          th:text="${service.status}">状态</span>
+                                </td>
+                                <td>
+                                    <code th:text="${service.port}">8080</code>
+                                </td>
+                                <td>
+                                    <small th:text="${#temporals.format(service.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 10:00</small>
+                                </td>
+                                <td>
+                                    <small th:text="${#temporals.format(service.updatedAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 10:00</small>
+                                </td>
+                                <td>
+                                    <div class="action-buttons" onclick="event.stopPropagation();">
+                                        <a th:href="@{'/service/' + ${service.id}}" class="btn btn-sm btn-outline-primary me-1">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button th:if="${service.status == 'RUNNING'}" 
+                                                th:data-service-id="${service.id}"
+                                                data-action="stop"
+                                                class="btn btn-sm btn-outline-warning me-1 action-btn"
+                                                th:onclick="'stopService(' + ${service.id} + ')'">
+                                            <i class="fas fa-stop"></i>
+                                        </button>
+                                        <button th:if="${service.status != 'RUNNING'}" 
+                                                th:data-service-id="${service.id}"
+                                                data-action="start"
+                                                class="btn btn-sm btn-outline-success me-1 action-btn"
+                                                th:onclick="'startService(' + ${service.id} + ')'">
+                                            <i class="fas fa-play"></i>
+                                        </button>
+                                        <button th:data-service-id="${service.id}"
+                                                data-action="regenerate"
+                                                class="btn btn-sm btn-outline-info me-1 action-btn"
+                                                th:onclick="'showConfirmDialog(\'fas fa-sync\', \'重新生成服务\', \'确定要重新生成这个Mock服务吗？这将覆盖现有的代码。\', () => regenerateService(' + ${service.id} + '))'">
+                                            <i class="fas fa-sync"></i>
+                                        </button>
+                                        <button th:data-service-id="${service.id}"
+                                                data-action="delete"
+                                                class="btn btn-sm btn-outline-danger action-btn"
+                                                th:onclick="'showConfirmDialog(\'fas fa-trash\', \'删除服务\', \'确定要删除这个Mock服务吗？此操作不可恢复。\', () => deleteService(' + ${service.id} + '))'">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             
             <!-- 分页组件 -->
@@ -629,6 +688,7 @@
             </div>
         </div>
     </section>
+    </div>
 
     <!-- 页脚 -->
     <footer class="bg-dark text-light py-4">
@@ -699,70 +759,8 @@
             initializePagination();
         });
         
-        // 初始化服务按钮状态
-        function initializeServiceButtons() {
-            const services = document.querySelectorAll('tbody tr');
-            services.forEach(row => {
-                const statusBadge = row.querySelector('.status-badge');
-                const actionButtons = row.querySelector('.action-buttons');
-                
-                if (statusBadge && actionButtons) {
-                    const status = statusBadge.textContent.trim();
-                    const serviceId = row.querySelector('button[data-service-id]')?.getAttribute('data-service-id');
-                    
-                    if (serviceId) {
-                        // 检查是否已经有正确的按钮
-                        const existingStartButton = actionButtons.querySelector('button[data-action="start"]');
-                        const existingStopButton = actionButtons.querySelector('button[data-action="stop"]');
-                        
-                        // 只有在按钮状态不匹配时才更新
-                        if (status === 'RUNNING' && !existingStopButton) {
-                            // 移除启动按钮（如果存在）
-                            if (existingStartButton) {
-                                existingStartButton.remove();
-                            }
-                            
-                            // 创建停止按钮
-                            const stopButton = document.createElement('button');
-                            stopButton.className = 'btn btn-sm btn-outline-warning me-1 action-btn';
-                            stopButton.setAttribute('data-service-id', serviceId);
-                            stopButton.setAttribute('data-action', 'stop');
-                            stopButton.onclick = function() { stopService(serviceId); };
-                            stopButton.innerHTML = '<i class="fas fa-stop"></i>';
-                            
-                            // 插入到查看详情按钮之后
-                            const viewButton = actionButtons.querySelector('a[href*="/service/"]');
-                            if (viewButton) {
-                                viewButton.parentNode.insertBefore(stopButton, viewButton.nextSibling);
-                            } else {
-                                actionButtons.insertBefore(stopButton, actionButtons.firstChild);
-                            }
-                        } else if (status !== 'RUNNING' && !existingStartButton) {
-                            // 移除停止按钮（如果存在）
-                            if (existingStopButton) {
-                                existingStopButton.remove();
-                            }
-                            
-                            // 创建启动按钮
-                            const startButton = document.createElement('button');
-                            startButton.className = 'btn btn-sm btn-outline-success me-1 action-btn';
-                            startButton.setAttribute('data-service-id', serviceId);
-                            startButton.setAttribute('data-action', 'start');
-                            startButton.onclick = function() { startService(serviceId); };
-                            startButton.innerHTML = '<i class="fas fa-play"></i>';
-                            
-                            // 插入到查看详情按钮之后
-                            const viewButton = actionButtons.querySelector('a[href*="/service/"]');
-                            if (viewButton) {
-                                viewButton.parentNode.insertBefore(startButton, viewButton.nextSibling);
-                            } else {
-                                actionButtons.insertBefore(startButton, actionButtons.firstChild);
-                            }
-                        }
-                    }
-                }
-            });
-        }
+        // 存储已绑定的事件监听器，避免重复绑定
+        const boundEventListeners = new Set();
         
         // 初始化事件监听器
         function initializeEventListeners() {
@@ -779,45 +777,62 @@
 
             // 清除搜索条件按钮事件
             const clearSearchBtn = document.getElementById('clearSearchBtn');
-            if (clearSearchBtn) {
-                clearSearchBtn.addEventListener('click', function() {
-                    // 清空搜索表单
-                    document.getElementById('searchKeyword').value = '';
-                    document.getElementById('statusFilter').value = '';
-                    document.getElementById('tagFilter').value = '';
-                    
-                    // 重置过滤条件
-                    currentFilters = {
-                        keyword: '',
-                        status: '',
-                        tag: ''
-                    };
-                    
-                    // 重置到第一页并重新加载
-                    currentPage = 1;
-                    loadServices();
-                });
+            if (clearSearchBtn && !boundEventListeners.has('clearSearchBtn')) {
+                clearSearchBtn.addEventListener('click', handleClearSearch);
+                boundEventListeners.add('clearSearchBtn');
             }
 
             // 跳转页码按钮事件
             const jumpToPageBtn = document.getElementById('jumpToPageBtn');
             const jumpToPageInput = document.getElementById('jumpToPage');
             if (jumpToPageBtn && jumpToPageInput) {
-                jumpToPageBtn.addEventListener('click', function() {
-                    const targetPage = parseInt(jumpToPageInput.value);
-                    if (targetPage && targetPage >= 1 && targetPage <= totalPages) {
-                        goToPage(targetPage);
-                        jumpToPageInput.value = '';
-                    } else {
-                        showToast('warning', '提示', `请输入有效的页码 (1-${totalPages})`);
-                    }
-                });
-
-                jumpToPageInput.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        jumpToPageBtn.click();
-                    }
-                });
+                if (!boundEventListeners.has('jumpToPageBtn')) {
+                    jumpToPageBtn.addEventListener('click', handleJumpToPage);
+                    boundEventListeners.add('jumpToPageBtn');
+                }
+                
+                if (!boundEventListeners.has('jumpToPageInput')) {
+                    jumpToPageInput.addEventListener('keypress', handleJumpToPageKeyPress);
+                    boundEventListeners.add('jumpToPageInput');
+                }
+            }
+        }
+        
+        // 清除搜索的处理函数
+        function handleClearSearch() {
+            // 清空搜索表单
+            document.getElementById('searchKeyword').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('tagFilter').value = '';
+            
+            // 重置过滤条件
+            currentFilters = {
+                keyword: '',
+                status: '',
+                tag: ''
+            };
+            
+            // 重置到第一页并重新加载
+            currentPage = 1;
+            loadServices();
+        }
+        
+        // 跳转到页面的处理函数
+        function handleJumpToPage() {
+            const jumpToPageInput = document.getElementById('jumpToPage');
+            const targetPage = parseInt(jumpToPageInput.value);
+            if (targetPage && targetPage >= 1 && targetPage <= totalPages) {
+                goToPage(targetPage);
+                jumpToPageInput.value = '';
+            } else {
+                showToast('warning', '提示', `请输入有效的页码 (1-${totalPages})`);
+            }
+        }
+        
+        // 跳转到页面按键处理函数
+        function handleJumpToPageKeyPress(e) {
+            if (e.key === 'Enter') {
+                handleJumpToPage();
             }
         }
         
@@ -1189,22 +1204,36 @@
         // 初始化分页
         function initializePagination() {
             const pageSizeSelect = document.getElementById('pageSize');
-            pageSizeSelect.addEventListener('change', function() {
-                pageSize = parseInt(this.value);
-                currentPage = 1;
-                loadServices();
-            });
+            // 添加页面大小选择器事件监听器
+            if (pageSizeSelect && !boundEventListeners.has('pageSizeSelect')) {
+                pageSizeSelect.addEventListener('change', handlePageSizeChange);
+                boundEventListeners.add('pageSizeSelect');
+            }
             
             // 初始化搜索表单
             const searchForm = document.getElementById('searchForm');
-            searchForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                currentPage = 1;
-                currentFilters.keyword = document.getElementById('searchKeyword').value;
-                currentFilters.status = document.getElementById('statusFilter').value;
-                currentFilters.tag = document.getElementById('tagFilter').value;
-                loadServices();
-            });
+            // 添加搜索表单提交事件监听器
+            if (searchForm && !boundEventListeners.has('searchForm')) {
+                searchForm.addEventListener('submit', handleSearchFormSubmit);
+                boundEventListeners.add('searchForm');
+            }
+        }
+        
+        // 页面大小改变处理函数
+        function handlePageSizeChange() {
+            pageSize = parseInt(this.value);
+            currentPage = 1;
+            loadServices();
+        }
+        
+        // 搜索表单提交处理函数
+        function handleSearchFormSubmit(e) {
+            e.preventDefault();
+            currentPage = 1;
+            currentFilters.keyword = document.getElementById('searchKeyword').value;
+            currentFilters.status = document.getElementById('statusFilter').value;
+            currentFilters.tag = document.getElementById('tagFilter').value;
+            loadServices();
         }
         
         // 加载服务数据
@@ -1253,8 +1282,7 @@
                 `;
             }
             
-            // 重新初始化事件监听器
-            initializeEventListeners();
+            // 只重新检查服务状态，不重新初始化事件监听器
             checkServiceStatuses();
         }
         
