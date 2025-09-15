@@ -1,6 +1,6 @@
-# Mock Server Generator
+# AI Mock Server
 
-基于Spring AI Alibaba框架的智能Mock Server生成器，能够自动解析API文档并生成完整的Mock Server服务。
+基于Spring AI Alibaba框架的智能Mock Server生成平台，能够自动解析API文档并生成完整的Mock Server服务。
 
 ## 功能特性
 
