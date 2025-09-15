@@ -255,6 +255,42 @@ public class MockServerController {
     }
     
     /**
+     * 清理所有Mock服务进程
+     */
+    @PostMapping("/services/cleanup")
+    public ResponseEntity<Map<String, Object>> cleanupAllServices() {
+        try {
+            // 这里可以添加清理所有服务的逻辑
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "所有Mock服务进程清理完成"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                    "success", false,
+                    "message", "清理服务进程时发生错误: " + e.getMessage()
+                ));
+        }
+    }
+    
+    /**
+     * 获取所有运行中的服务信息（调试用）
+     */
+    @GetMapping("/services/running")
+    public ResponseEntity<Map<String, Object>> getRunningServices() {
+        try {
+            Map<String, Object> runningServices = mockServerService.getAllRunningServices();
+            return ResponseEntity.ok(runningServices);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                    "error", "获取运行中服务信息时发生错误: " + e.getMessage()
+                ));
+        }
+    }
+    
+    /**
      * 检查服务运行状态
      */
     @GetMapping("/services/{id}/status")

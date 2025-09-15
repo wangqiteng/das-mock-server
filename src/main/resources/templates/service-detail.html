@@ -614,9 +614,11 @@
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-sm btn-outline-info"
+                                            th:data-endpoint-id="${endpoint.id}"
                                             th:data-endpoint-path="${endpoint.path}"
                                             th:data-endpoint-method="${endpoint.method}"
-                                            onclick="testEndpoint(this.getAttribute('data-endpoint-path'), this.getAttribute('data-endpoint-method'))">
+                                            th:data-test-request-body="${endpoint.testRequestBody}"
+                                            onclick="testEndpoint(this.getAttribute('data-endpoint-id'), this.getAttribute('data-endpoint-path'), this.getAttribute('data-endpoint-method'), this.getAttribute('data-test-request-body'))">
                                         <i class="fas fa-play"></i>
                                     </button>
                                 </div>
@@ -826,9 +828,14 @@
 
                                 <!-- Raw -->
                                 <div id="rawContent" class="body-content" style="display: none;">
-                                    <h6 class="mb-2 fw-bold text-warning">
-                                        <i class="fas fa-code me-2"></i>Raw Content
-                                    </h6>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 fw-bold text-warning">
+                                            <i class="fas fa-code me-2"></i>Raw Content
+                                        </h6>
+                                        <small class="text-muted" id="testDataHint" style="display: none;">
+                                            <i class="fas fa-info-circle me-1"></i>已预填充测试数据
+                                        </small>
+                                    </div>
                                     <div class="row">
                                         <div class="col-4">
                                             <label class="form-label fw-semibold small">类型</label>
@@ -1302,7 +1309,7 @@
         window.location.href = `/endpoint/${endpointId}/edit`;
     }
 
-    function testEndpoint(path, method) {
+    function testEndpoint(endpointId, path, method, testRequestBody) {
         const baseUrl = document.getElementById('serviceBaseUrl').value;
         document.getElementById('testUrl').value = `${baseUrl}${path}`;
         document.getElementById('testMethod').value = method;
@@ -1310,6 +1317,46 @@
 
         // 重置表单
         clearTestData();
+
+        // 如果有测试请求体数据，预填充到Raw内容中
+        if (testRequestBody && testRequestBody.trim() !== '') {
+            try {
+                // 验证JSON格式
+                JSON.parse(testRequestBody);
+                
+                // 选择Raw类型
+                document.getElementById('bodyTypeRaw').checked = true;
+                toggleBodyInput();
+                
+                // 设置JSON类型
+                document.getElementById('rawType').value = 'application/json';
+                
+                // 填充请求体内容
+                document.getElementById('rawBody').value = JSON.stringify(JSON.parse(testRequestBody), null, 2);
+                
+                // 显示测试数据提示
+                document.getElementById('testDataHint').style.display = 'inline';
+                
+                // 设置Content-Type请求头
+                const headerRows = document.querySelectorAll('#headersContainer .header-row');
+                if (headerRows.length > 0) {
+                    const firstRow = headerRows[0];
+                    const nameInput = firstRow.querySelector('input[name="headerName"]');
+                    const valueInput = firstRow.querySelector('input[name="headerValue"]');
+                    if (nameInput && valueInput) {
+                        nameInput.value = 'Content-Type';
+                        valueInput.value = 'application/json';
+                    }
+                }
+            } catch (e) {
+                console.warn('测试请求体数据格式不正确:', e);
+                // 如果JSON格式不正确，仍然填充原始数据
+                document.getElementById('bodyTypeRaw').checked = true;
+                toggleBodyInput();
+                document.getElementById('rawType').value = 'application/json';
+                document.getElementById('rawBody').value = testRequestBody;
+            }
+        }
 
         const modal = new bootstrap.Modal(document.getElementById('testEndpointModal'));
         modal.show();
@@ -1607,6 +1654,9 @@
 
         // 清空响应
         document.getElementById('testResponse').textContent = '点击测试按钮发送请求...';
+        
+        // 隐藏测试数据提示
+        document.getElementById('testDataHint').style.display = 'none';
     }
 </script>
 </body>

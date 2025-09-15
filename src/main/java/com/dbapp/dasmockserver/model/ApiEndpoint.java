@@ -40,6 +40,9 @@ public class ApiEndpoint {
     @Column(columnDefinition = "TEXT")
     private String mockResponse;
     
+    @Column(columnDefinition = "TEXT")
+    private String testRequestBody;
+    
     private Integer responseDelay;
     
     private Integer statusCode;
@@ -142,6 +145,14 @@ public class ApiEndpoint {
     
     public void setMockResponse(String mockResponse) {
         this.mockResponse = mockResponse;
+    }
+    
+    public String getTestRequestBody() {
+        return testRequestBody;
+    }
+    
+    public void setTestRequestBody(String testRequestBody) {
+        this.testRequestBody = testRequestBody;
     }
     
     public Integer getResponseDelay() {

@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -96,10 +97,19 @@ public class MockServerService {
                 apiEndpointRepository.save(endpoint);
             }
             
-            // 生成Mock响应
+            // 生成Mock响应和测试请求体
             for (ApiEndpoint endpoint : endpoints) {
                 String mockResponse = aiCodeGenerationService.generateMockResponse(endpoint);
                 endpoint.setMockResponse(mockResponse);
+                
+                // 为需要请求体的端点生成测试请求体
+                if (endpoint.getMethod() == ApiEndpoint.HttpMethod.POST || 
+                    endpoint.getMethod() == ApiEndpoint.HttpMethod.PUT || 
+                    endpoint.getMethod() == ApiEndpoint.HttpMethod.PATCH) {
+                    String testRequestBody = aiCodeGenerationService.generateTestRequestBody(endpoint);
+                    endpoint.setTestRequestBody(testRequestBody);
+                }
+                
                 apiEndpointRepository.save(endpoint);
             }
             
@@ -252,6 +262,13 @@ public class MockServerService {
      */
     public String getServiceLog(Long serviceId) {
         return processManagementService.getServiceLog(serviceId);
+    }
+    
+    /**
+     * 获取所有运行中的服务信息
+     */
+    public Map<String, Object> getAllRunningServices() {
+        return processManagementService.getAllRunningServices();
     }
     
     /**

@@ -5,6 +5,7 @@ import com.dbapp.dasmockserver.model.MockService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.squareup.javapoet.*;
+import com.squareup.javapoet.ParameterizedTypeName;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -232,11 +233,26 @@ public class CodeGenerationService {
         // 添加RequestBody参数到方法签名
         if (parameterInfo.getRequestBody() != null && !parameterInfo.getRequestBody().getProperties().isEmpty()) {
             String requestClassName = generateClassName(endpoint.getName() + "Request");
-            methodBuilder.addParameter(
-                ParameterSpec.builder(ClassName.get("com.dbapp." + sanitizeProjectName(endpoint.getMockService().getName()).toLowerCase() + ".dto", requestClassName), "request")
-                    .addAnnotation(ClassName.get("org.springframework.web.bind.annotation", "RequestBody"))
-                    .build()
-            );
+            ClassName requestClass = ClassName.get("com.dbapp." + sanitizeProjectName(endpoint.getMockService().getName()).toLowerCase() + ".dto", requestClassName);
+            
+            // 根据requestBody类型决定参数类型
+            if ("array".equals(parameterInfo.getRequestBody().getType())) {
+                // 如果是数组类型，使用List<Request>
+                ClassName listType = ClassName.get("java.util", "List");
+                TypeName listOfRequest = ParameterizedTypeName.get(listType, requestClass);
+                methodBuilder.addParameter(
+                    ParameterSpec.builder(listOfRequest, "requests")
+                        .addAnnotation(ClassName.get("org.springframework.web.bind.annotation", "RequestBody"))
+                        .build()
+                );
+            } else {
+                // 如果是对象类型，使用单个Request
+                methodBuilder.addParameter(
+                    ParameterSpec.builder(requestClass, "request")
+                        .addAnnotation(ClassName.get("org.springframework.web.bind.annotation", "RequestBody"))
+                        .build()
+                );
+            }
         }
         
         // 添加HTTP方法注解
@@ -1292,7 +1308,9 @@ public class CodeGenerationService {
         
         // 打印请求体参数
         if (parameterInfo.getRequestBody() != null && !parameterInfo.getRequestBody().getProperties().isEmpty()) {
-            methodBuilder.addStatement("logger.info($S + $L)", "Request body: ", "request");
+            // 根据requestBody类型决定参数名
+            String paramName = "array".equals(parameterInfo.getRequestBody().getType()) ? "requests" : "request";
+            methodBuilder.addStatement("logger.info($S + $L)", "Request body: ", paramName);
             
             // 使用try-catch包装JSON序列化，避免编译错误
             CodeBlock jsonLogBlock = CodeBlock.builder()
@@ -1300,7 +1318,7 @@ public class CodeGenerationService {
                 .add("  logger.info($S + new $T().writeValueAsString($L));\n", 
                     "Request body JSON: ", 
                     ClassName.get("com.fasterxml.jackson.databind", "ObjectMapper"),
-                    "request")
+                    paramName)
                 .add("} catch ($T e) {\n", ClassName.get("com.fasterxml.jackson.core", "JsonProcessingException"))
                 .add("  logger.warn($S + e.getMessage());\n", "Failed to serialize request body to JSON: ")
                 .add("}")

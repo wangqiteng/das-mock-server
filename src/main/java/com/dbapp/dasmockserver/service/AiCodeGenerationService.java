@@ -278,7 +278,8 @@ public class AiCodeGenerationService {
      */
     public String generateMockResponse(ApiEndpoint endpoint) throws JsonProcessingException {
         // 如果有恒脑配置，则使用恒脑配置
-        if (hengNaoSwitch) {
+        AiConfig.AiModelConfig config = temporaryConfig.get();
+        if (("hengNao".equals(config.getModelName())) && hengNaoSwitch) {
             String prompt = buildMockResponsePrompt(endpoint);
 
             // 使用动态配置调用AI
@@ -333,27 +334,30 @@ public class AiCodeGenerationService {
                         }
                     ],
                     "requestBody": {
-                        // 格式1: array类型
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "fieldName": {
-                                    "type": "string|integer|boolean|array|object",
-                                    "required": true|false,
-                                    "description": "字段描述"
-                                }
+                        // 根据实际API文档分析请求体结构
+                        // 如果是对象类型，使用以下格式：
+                        "type": "object",
+                        "properties": {
+                            "fieldName": {
+                                "type": "string|integer|boolean|array|object",
+                                "required": true|false,
+                                "description": "字段描述",
+                                "example": "示例值"
                             }
                         }
-                        // 格式2: object类型
-                        // "type": "object",
-                        // "properties": {
-                        //     "fieldName": {
-                        //         "type": "string|integer|boolean|array|object",
-                        //         "required": true|false,
-                        //         "description": "字段描述"
+                        // 如果是数组类型，使用以下格式：
+                        // "type": "array",
+                        // "items": {
+                        //     "type": "object",
+                        //     "properties": {
+                        //         "fieldName": {
+                        //             "type": "string|integer|boolean|array|object",
+                        //             "required": true|false,
+                        //             "description": "字段描述"
+                        //         }
                         //     }
                         // }
+                        // 注意：请根据实际API文档内容分析，不要默认使用数组格式
                     }
                 },
                 "responseSchema": {
@@ -391,8 +395,15 @@ public class AiCodeGenerationService {
                 - array格式：当请求体是数组时使用，包含type:"array"和items结构
                 - object格式：当请求体是单个对象时使用，包含type:"object"和properties结构
             15. 根据文档内容判断使用哪种格式：
-                - 如果文档提到"数组"、"列表"、"批量"等关键词，使用array格式
-                - 如果文档提到单个对象或没有明确说明，使用object格式
+                - 如果文档明确提到"数组"、"列表"、"批量"等关键词，使用array格式
+                - 如果文档提到单个对象、实体、记录或没有明确说明，使用object格式
+                - 重要：不要默认使用array格式，大多数API的请求体都是object格式
+                - 只有在文档明确说明是数组或批量操作时才使用array格式
+            16. 请求体字段分析：
+                - 仔细分析文档中的字段描述，理解每个字段的业务含义
+                - 根据字段名称推断数据类型（如：name->string, age->integer, isActive->boolean）
+                - 为每个字段提供合理的示例值
+                - 确保必填字段标记为required: true
             
             请确保：
             1. 准确识别HTTP方法和路径
@@ -474,6 +485,10 @@ public class AiCodeGenerationService {
             7. 代码要完整可运行
             8. 使用提供的类名和方法名
             9. 确保所有标识符符合Java命名规范
+            10. 重要：根据请求Schema类型正确生成参数类型：
+                - 如果requestBody的type是"array"，控制器方法参数应该使用List<Request>类型
+                - 如果requestBody的type是"object"，控制器方法参数应该使用单个Request类型
+                - 参数名应该与类型匹配：List类型用"requests"，单个对象用"request"
             
             请按文件分别返回，每个文件用```java开始，```结束。
             """, 
@@ -488,6 +503,278 @@ public class AiCodeGenerationService {
         );
     }
     
+    /**
+     * 为API端点生成测试请求体
+     */
+    public String generateTestRequestBody(ApiEndpoint endpoint) throws JsonProcessingException {
+        // 如果有恒脑配置，则使用恒脑配置
+        AiConfig.AiModelConfig config = temporaryConfig.get();
+        if (("hengNao".equals(config.getModelName())) && hengNaoSwitch) {
+            String prompt = buildTestRequestBodyPrompt(endpoint);
+            String response = callHengNaoAi(prompt);
+            return parseHengNaoApiResponse(response);
+        }
+
+        // 如果没有AI相关配置，返回空
+        if (chatClient == null) {
+            return generateDefaultTestRequestBody(endpoint);
+        }
+
+        String prompt = buildTestRequestBodyPrompt(endpoint);
+        
+        // 使用动态配置调用AI
+        String response = callAiWithDynamicConfig(prompt);
+
+        // 清除临时配置
+        if (temporaryConfig.get() != null) {
+            clearTemporaryAiConfig();
+        }
+        // 清理响应，移除markdown格式
+        return cleanMockResponse(response);
+    }
+
+    /**
+     * 构建测试请求体生成提示词
+     */
+    private String buildTestRequestBodyPrompt(ApiEndpoint endpoint) {
+        return String.format("""
+            请为以下API端点生成一个真实的测试请求体数据：
+            
+            端点信息：
+            - 名称: %s
+            - 路径: %s
+            - 方法: %s
+            - 描述: %s
+            - 请求Schema: %s
+            
+            重要要求：
+            1. 仔细分析请求Schema，理解每个字段的含义和类型
+            2. 根据字段名称和描述，生成符合实际业务场景的测试数据
+            3. 不要使用固定的模板格式，要根据具体的API需求生成
+            4. 如果是用户相关API，生成真实的用户信息（姓名、邮箱等）
+            5. 如果是产品相关API，生成真实的产品信息（名称、价格、描述等）
+            6. 如果是订单相关API，生成真实的订单信息（用户ID、产品ID、数量等）
+            7. 如果是查询API，生成合理的查询条件
+            8. 如果是更新API，生成要更新的具体字段值
+            9. 确保数据类型完全匹配Schema要求
+            10. 只返回JSON格式的请求体，不要任何其他文字
+            11. 如果Schema是数组类型，生成1-3个元素的数组
+            12. 如果Schema是对象类型，生成完整的对象结构
+            13. 字段值要真实可信，避免使用"示例"、"测试"等占位符
+            
+            请根据以上要求生成测试数据：
+            """,
+            endpoint.getName(),
+            endpoint.getPath(),
+            endpoint.getMethod().name(),
+            endpoint.getDescription() != null ? endpoint.getDescription() : "",
+            endpoint.getRequestSchema() != null ? endpoint.getRequestSchema() : "{}"
+        );
+    }
+
+    /**
+     * 生成默认的测试请求体
+     */
+    private String generateDefaultTestRequestBody(ApiEndpoint endpoint) {
+        // 根据端点名称、路径和描述生成更智能的测试数据
+        String endpointName = endpoint.getName().toLowerCase();
+        String path = endpoint.getPath().toLowerCase();
+        String description = endpoint.getDescription() != null ? endpoint.getDescription().toLowerCase() : "";
+        String method = endpoint.getMethod().name();
+        
+        // 分析请求Schema，尝试理解字段结构
+        String requestSchema = endpoint.getRequestSchema();
+        
+        // 用户相关API
+        if (endpointName.contains("user") || path.contains("user") || description.contains("用户")) {
+            if (method.equals("POST")) {
+                return """
+                    {
+                        "username": "john_doe",
+                        "email": "john.doe@example.com",
+                        "password": "SecurePass123!",
+                        "firstName": "John",
+                        "lastName": "Doe",
+                        "phone": "+86-138-0013-8000",
+                        "birthDate": "1990-05-15",
+                        "gender": "male"
+                    }
+                    """;
+            } else if (method.equals("PUT") || method.equals("PATCH")) {
+                return """
+                    {
+                        "firstName": "John",
+                        "lastName": "Smith",
+                        "phone": "+86-138-0013-8001",
+                        "email": "john.smith@example.com"
+                    }
+                    """;
+            }
+        }
+        
+        // 产品相关API
+        if (endpointName.contains("product") || path.contains("product") || description.contains("产品")) {
+            if (method.equals("POST")) {
+                return """
+                    {
+                        "name": "iPhone 15 Pro",
+                        "description": "最新款苹果手机，配备A17 Pro芯片",
+                        "price": 7999.00,
+                        "currency": "CNY",
+                        "category": "electronics",
+                        "brand": "Apple",
+                        "stock": 50,
+                        "sku": "IPH15PRO-256-BLK",
+                        "weight": 187.0,
+                        "dimensions": {
+                            "length": 146.6,
+                            "width": 70.6,
+                            "height": 8.25
+                        }
+                    }
+                    """;
+            } else if (method.equals("PUT") || method.equals("PATCH")) {
+                return """
+                    {
+                        "price": 7499.00,
+                        "stock": 45,
+                        "description": "iPhone 15 Pro - 限时优惠"
+                    }
+                    """;
+            }
+        }
+        
+        // 订单相关API
+        if (endpointName.contains("order") || path.contains("order") || description.contains("订单")) {
+            if (method.equals("POST")) {
+                return """
+                    {
+                        "customerId": 12345,
+                        "items": [
+                            {
+                                "productId": 1001,
+                                "quantity": 2,
+                                "unitPrice": 199.99
+                            },
+                            {
+                                "productId": 1002,
+                                "quantity": 1,
+                                "unitPrice": 299.99
+                            }
+                        ],
+                        "shippingAddress": {
+                            "street": "北京市朝阳区建国路88号",
+                            "city": "北京",
+                            "state": "北京",
+                            "postalCode": "100025",
+                            "country": "中国"
+                        },
+                        "paymentMethod": "credit_card",
+                        "notes": "请在工作日配送"
+                    }
+                    """;
+            }
+        }
+        
+        // 认证相关API
+        if (endpointName.contains("login") || endpointName.contains("auth") || path.contains("login") || path.contains("auth")) {
+            return """
+                {
+                    "username": "john_doe",
+                    "password": "SecurePass123!",
+                    "rememberMe": true
+                }
+                """;
+        }
+        
+        // 搜索/查询相关API
+        if (method.equals("POST") && (endpointName.contains("search") || endpointName.contains("query") || path.contains("search"))) {
+            return """
+                {
+                    "keyword": "智能手机",
+                    "category": "electronics",
+                    "minPrice": 1000,
+                    "maxPrice": 5000,
+                    "brand": ["Apple", "Samsung", "Huawei"],
+                    "sortBy": "price",
+                    "sortOrder": "asc",
+                    "page": 1,
+                    "pageSize": 20
+                }
+                """;
+        }
+        
+        // 文件上传相关API
+        if (endpointName.contains("upload") || path.contains("upload") || description.contains("上传")) {
+            return """
+                {
+                    "fileName": "document.pdf",
+                    "fileType": "application/pdf",
+                    "fileSize": 1024000,
+                    "description": "重要文档",
+                    "category": "documents"
+                }
+                """;
+        }
+        
+        // 配置/设置相关API
+        if (endpointName.contains("config") || endpointName.contains("setting") || path.contains("config")) {
+            return """
+                {
+                    "theme": "dark",
+                    "language": "zh-CN",
+                    "notifications": {
+                        "email": true,
+                        "sms": false,
+                        "push": true
+                    },
+                    "privacy": {
+                        "profileVisible": true,
+                        "dataSharing": false
+                    }
+                }
+                """;
+        }
+        
+        // 通用创建操作
+        if (method.equals("POST")) {
+            return """
+                {
+                    "name": "新项目",
+                    "description": "这是一个新创建的项目",
+                    "status": "active",
+                    "priority": "medium",
+                    "tags": ["重要", "紧急"],
+                    "assignee": "john_doe",
+                    "dueDate": "2024-12-31"
+                }
+                """;
+        }
+        
+        // 通用更新操作
+        if (method.equals("PUT") || method.equals("PATCH")) {
+            return """
+                {
+                    "name": "更新后的项目",
+                    "status": "completed",
+                    "priority": "high",
+                    "notes": "项目已完成更新"
+                }
+                """;
+        }
+        
+        // 默认情况
+        return """
+            {
+                "id": 1,
+                "name": "测试数据",
+                "description": "这是一个测试请求体",
+                "status": "active",
+                "createdAt": "2024-01-01T10:00:00Z"
+            }
+            """;
+    }
+
     /**
      * 构建Mock响应生成提示词
      */
@@ -1454,11 +1741,6 @@ public class AiCodeGenerationService {
                     .withMaxToken(config.getMaxTokens())
                     .build();
             String result = chatClient.prompt(new Prompt(DEFAULT_PROMPT,customOptions)).user(prompt).call().content();
-            
-            // 清除临时配置
-            if (temporaryConfig.get() != null) {
-                clearTemporaryAiConfig();
-            }
             
             return result;
             

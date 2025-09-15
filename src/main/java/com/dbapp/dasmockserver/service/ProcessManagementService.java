@@ -26,6 +26,48 @@ public class ProcessManagementService {
     private final Map<Long, StringBuilder> processLogs = new ConcurrentHashMap<>();
     
     /**
+     * 初始化时清理可能残留的进程
+     */
+    public void cleanupOrphanedProcesses() {
+        log.info("开始清理可能残留的Mock Server进程...");
+        
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            String[] command;
+            
+            if (os.contains("win")) {
+                // Windows系统查找Maven和Java进程
+                command = new String[]{"cmd", "/c", "tasklist", "/FI", "IMAGENAME eq java.exe", "/FO", "CSV"};
+            } else {
+                // Unix/Linux/Mac系统查找Java进程
+                command = new String[]{"ps", "aux", "|", "grep", "java"};
+            }
+            
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            Process process = processBuilder.start();
+            
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream())
+            );
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // 检查是否包含Spring Boot相关的进程
+                if (line.contains("spring-boot:run") || line.contains("MockController")) {
+                    log.warn("发现可能残留的Mock Server进程: {}", line);
+                    // 这里可以添加自动清理逻辑，但为了安全起见，暂时只记录日志
+                }
+            }
+            
+            process.waitFor();
+            log.info("进程清理检查完成");
+            
+        } catch (Exception e) {
+            log.error("清理残留进程时发生错误", e);
+        }
+    }
+    
+    /**
      * 启动Mock Server进程
      */
     public boolean startMockServer(Long serviceId, String projectPath, Integer port) {
@@ -101,24 +143,62 @@ public class ProcessManagementService {
                 return true;
             }
             
-            log.info("停止Mock Server: serviceId={}, pid={}", serviceId, getProcessId(process));
+            Long pid = getProcessId(process);
+            log.info("停止Mock Server: serviceId={}, pid={}", serviceId, pid);
             
-            // 优雅关闭进程
+            // 首先尝试优雅关闭进程
+            log.info("尝试优雅关闭进程: serviceId={}, pid={}", serviceId, pid);
             process.destroy();
             
             // 等待进程结束
             boolean terminated = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            log.info("优雅关闭结果: serviceId={}, terminated={}, isAlive={}", serviceId, terminated, process.isAlive());
             
             if (!terminated) {
-                // 强制终止进程
+                // 优雅关闭失败，强制终止进程
                 log.warn("优雅关闭失败，强制终止进程: serviceId={}", serviceId);
                 process.destroyForcibly();
-                process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+                boolean forceTerminated = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+                log.info("强制终止结果: serviceId={}, terminated={}, isAlive={}", serviceId, forceTerminated, process.isAlive());
             }
             
-            cleanupProcess(serviceId);
-            log.info("Mock Server停止成功: serviceId={}", serviceId);
-            return true;
+            // 如果进程仍然存活，尝试通过系统命令强制终止
+            if (process.isAlive() && pid > 0) {
+                log.warn("进程仍然存活，尝试通过系统命令强制终止: serviceId={}, pid={}", serviceId, pid);
+                forceKillProcess(pid);
+                
+                // 再次等待
+                process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            
+            // 如果进程仍然存活，尝试终止整个进程树
+            if (process.isAlive() && pid > 0) {
+                log.warn("进程仍然存活，尝试终止整个进程树: serviceId={}, pid={}", serviceId, pid);
+                forceKillProcessTree(pid);
+                
+                // 最后等待
+                process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            
+            // 最终检查进程是否真的停止了
+            boolean isAlive = process.isAlive();
+            boolean isReallyRunning = isProcessReallyRunning(pid);
+            
+            log.info("最终检查结果: serviceId={}, pid={}, isAlive={}, isReallyRunning={}", 
+                serviceId, pid, isAlive, isReallyRunning);
+            
+            if (isAlive || isReallyRunning) {
+                log.error("无法停止Mock Server进程: serviceId={}, pid={}, isAlive={}, isReallyRunning={}", 
+                    serviceId, pid, isAlive, isReallyRunning);
+                // 即使进程没有停止，也要清理资源
+                cleanupProcess(serviceId);
+                return false;
+            } else {
+                log.info("Mock Server停止成功: serviceId={}", serviceId);
+                // 进程已停止，清理资源
+                cleanupProcess(serviceId);
+                return true;
+            }
             
         } catch (Exception e) {
             log.error("停止Mock Server时发生错误: serviceId={}", serviceId, e);
@@ -158,6 +238,34 @@ public class ProcessManagementService {
     public String getServiceLog(Long serviceId) {
         StringBuilder log = processLogs.get(serviceId);
         return log != null ? log.toString() : "";
+    }
+    
+    /**
+     * 获取所有运行中的服务信息
+     */
+    public Map<String, Object> getAllRunningServices() {
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("runningProcesses", runningProcesses.size());
+        result.put("processIds", processIds.size());
+        result.put("processLogs", processLogs.size());
+        
+        Map<String, Object> services = new java.util.HashMap<>();
+        for (Map.Entry<Long, Process> entry : runningProcesses.entrySet()) {
+            Long serviceId = entry.getKey();
+            Process process = entry.getValue();
+            Long pid = processIds.get(serviceId);
+            
+            Map<String, Object> serviceInfo = new java.util.HashMap<>();
+            serviceInfo.put("serviceId", serviceId);
+            serviceInfo.put("pid", pid);
+            serviceInfo.put("isAlive", process.isAlive());
+            serviceInfo.put("isReallyRunning", pid > 0 ? isProcessReallyRunning(pid) : false);
+            
+            services.put(serviceId.toString(), serviceInfo);
+        }
+        
+        result.put("services", services);
+        return result;
     }
     
     /**
@@ -253,5 +361,104 @@ public class ProcessManagementService {
         runningProcesses.remove(serviceId);
         processIds.remove(serviceId);
         processLogs.remove(serviceId);
+    }
+    
+    /**
+     * 通过系统命令强制终止进程
+     */
+    private void forceKillProcess(Long pid) {
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            String[] command;
+            
+            if (os.contains("win")) {
+                // Windows系统使用taskkill命令
+                command = new String[]{"cmd", "/c", "taskkill", "/F", "/PID", String.valueOf(pid)};
+            } else {
+                // Unix/Linux/Mac系统使用kill命令
+                command = new String[]{"kill", "-9", String.valueOf(pid)};
+            }
+            
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            Process killProcess = processBuilder.start();
+            killProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+            
+            log.info("执行强制终止命令: {}", String.join(" ", command));
+            
+        } catch (Exception e) {
+            log.error("强制终止进程失败: pid={}", pid, e);
+        }
+    }
+    
+    /**
+     * 通过系统命令强制终止进程树
+     */
+    private void forceKillProcessTree(Long pid) {
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            String[] command;
+            
+            if (os.contains("win")) {
+                // Windows系统使用taskkill命令终止进程树
+                command = new String[]{"cmd", "/c", "taskkill", "/F", "/T", "/PID", String.valueOf(pid)};
+            } else {
+                // Unix/Linux/Mac系统使用pkill命令终止进程树
+                command = new String[]{"pkill", "-9", "-P", String.valueOf(pid)};
+            }
+            
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            Process killProcess = processBuilder.start();
+            killProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+            
+            log.info("执行强制终止进程树命令: {}", String.join(" ", command));
+            
+        } catch (Exception e) {
+            log.error("强制终止进程树失败: pid={}", pid, e);
+        }
+    }
+    
+    /**
+     * 检查进程是否真的在运行（通过系统命令）
+     */
+    private boolean isProcessReallyRunning(Long pid) {
+        if (pid <= 0) {
+            return false;
+        }
+        
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            String[] command;
+            
+            if (os.contains("win")) {
+                // Windows系统使用tasklist命令
+                command = new String[]{"cmd", "/c", "tasklist", "/FI", "PID eq " + pid, "/FO", "CSV"};
+            } else {
+                // Unix/Linux/Mac系统使用ps命令
+                command = new String[]{"ps", "-p", String.valueOf(pid)};
+            }
+            
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            Process process = processBuilder.start();
+            
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream())
+            );
+            
+            String line;
+            boolean found = false;
+            while ((line = reader.readLine()) != null) {
+                if (line.contains(String.valueOf(pid))) {
+                    found = true;
+                    break;
+                }
+            }
+            
+            process.waitFor();
+            return found;
+            
+        } catch (Exception e) {
+            log.error("检查进程是否运行时发生错误: pid={}", pid, e);
+            return false;
+        }
     }
 } 
