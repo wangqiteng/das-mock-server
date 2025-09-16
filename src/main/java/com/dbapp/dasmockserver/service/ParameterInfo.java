@@ -52,6 +52,7 @@ public class ParameterInfo {
         private String type;
         private boolean required;
         private String description;
+        private String originalName; // 原始变量名，用于@PathVariable注解的value属性
         
         public Parameter() {
         }
@@ -93,6 +94,14 @@ public class ParameterInfo {
         
         public void setDescription(String description) {
             this.description = description;
+        }
+        
+        public String getOriginalName() {
+            return originalName;
+        }
+        
+        public void setOriginalName(String originalName) {
+            this.originalName = originalName;
         }
     }
     

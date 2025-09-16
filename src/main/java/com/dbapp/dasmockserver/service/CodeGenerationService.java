@@ -199,11 +199,13 @@ public class CodeGenerationService {
         // 添加PathVariable参数到方法签名
         for (ParameterInfo.Parameter param : parameterInfo.getPathVariables()) {
             ClassName paramType = getParameterType(param.getType());
+            // 使用原始变量名作为@PathVariable的value，如果没有原始变量名则使用Java变量名
+            String pathVariableValue = param.getOriginalName() != null ? param.getOriginalName() : param.getName();
             methodBuilder.addParameter(
                 ParameterSpec.builder(paramType, param.getName())
                     .addAnnotation(AnnotationSpec.builder(
                         ClassName.get("org.springframework.web.bind.annotation", "PathVariable"))
-                        .addMember("value", "$S", param.getName())
+                        .addMember("value", "$S", pathVariableValue)
                         .build())
                     .build()
             );
@@ -335,6 +337,32 @@ public class CodeGenerationService {
             paramName = paramName.replaceAll("[^a-zA-Z0-9_]", "");
             if (!paramName.isEmpty()) {
                 pathVariables.add(paramName);
+            }
+        }
+        
+        return pathVariables;
+    }
+    
+    /**
+     * 提取路径中的PathVariable参数，返回原始变量名和Java变量名的映射
+     */
+    public Map<String, String> extractPathVariablesWithMapping(String path) {
+        Map<String, String> pathVariables = new HashMap<>();
+        
+        if (path == null || path.trim().isEmpty()) {
+            return pathVariables;
+        }
+        
+        // 使用正则表达式匹配 {param} 格式的参数
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\{([^}]+)\\}");
+        java.util.regex.Matcher matcher = pattern.matcher(path);
+        
+        while (matcher.find()) {
+            String originalParamName = matcher.group(1);
+            // 生成Java变量名，移除特殊字符
+            String javaParamName = originalParamName.replaceAll("[^a-zA-Z0-9_]", "");
+            if (!javaParamName.isEmpty()) {
+                pathVariables.put(javaParamName, originalParamName);
             }
         }
         
@@ -1430,9 +1458,12 @@ public class CodeGenerationService {
         
         // 回退到旧的方式：从路径中提取pathVariables，从requestSchema中提取其他参数
         String path = endpoint.getPath();
-        List<String> pathVars = extractPathVariables(path);
-        for (String pathVar : pathVars) {
-            ParameterInfo.Parameter param = new ParameterInfo.Parameter(pathVar, "string", true, "");
+        Map<String, String> pathVarMapping = extractPathVariablesWithMapping(path);
+        for (Map.Entry<String, String> entry : pathVarMapping.entrySet()) {
+            String javaParamName = entry.getKey();
+            String originalParamName = entry.getValue();
+            ParameterInfo.Parameter param = new ParameterInfo.Parameter(javaParamName, "string", true, "");
+            param.setOriginalName(originalParamName); // 保存原始变量名
             parameterInfo.getPathVariables().add(param);
         }
         
