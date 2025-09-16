@@ -3,14 +3,12 @@ package com.dbapp.dasmockserver.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @Slf4j
@@ -24,6 +22,9 @@ public class ProcessManagementService {
     
     // 存储进程输出日志
     private final Map<Long, StringBuilder> processLogs = new ConcurrentHashMap<>();
+    
+    // 存储服务端口信息
+    private final Map<Long, Integer> servicePorts = new ConcurrentHashMap<>();
     
     /**
      * 初始化时清理可能残留的进程
@@ -108,19 +109,28 @@ public class ProcessManagementService {
             
             // 存储进程信息
             runningProcesses.put(serviceId, process);
-            processIds.put(serviceId, getProcessId(process));
             
             // 启动日志收集线程
             startLogCollector(serviceId, process);
-            
-            // 等待一段时间检查进程是否正常启动
-            Thread.sleep(3000);
-            
-            if (process.isAlive()) {
-                log.info("Mock Server启动成功: serviceId={}, pid={}", serviceId, getProcessId(process));
+
+            // 获取实际的Java进程ID
+            Long javaPid = -1L;
+            int waitTimeOut = 0;
+            while(waitTimeOut < 10 && javaPid < 0){
+                // 循环等待等待一段时间让Java进程启动
+                log.info("正在等待Mock Server启动: serviceId={}, port={}", serviceId, port);
+                Thread.sleep(1000);
+                waitTimeOut++;
+                javaPid = findJavaProcessId(serviceId, port);
+            }
+
+            if (javaPid > 0) {
+                processIds.put(serviceId, javaPid);
+                servicePorts.put(serviceId, port);
+                log.info("Mock Server启动成功: serviceId={}, javaPid={}, port={}", serviceId, javaPid, port);
                 return true;
             } else {
-                log.error("Mock Server启动失败: serviceId={}", serviceId);
+                log.error("Mock Server启动失败，未找到Java进程: serviceId={}", serviceId);
                 cleanupProcess(serviceId);
                 return false;
             }
@@ -138,64 +148,44 @@ public class ProcessManagementService {
     public boolean stopMockServer(Long serviceId) {
         try {
             Process process = runningProcesses.get(serviceId);
-            if (process == null) {
+            Long javaPid = processIds.get(serviceId);
+            
+            if (process == null && javaPid == null) {
                 log.warn("服务 {} 没有运行中的进程", serviceId);
                 return true;
             }
             
-            Long pid = getProcessId(process);
-            log.info("停止Mock Server: serviceId={}, pid={}", serviceId, pid);
+            log.info("停止Mock Server: serviceId={}, javaPid={}", serviceId, javaPid);
+
+            // 尝试强制终止Java进程
+            if (javaPid != null && javaPid > 0) {
+                log.warn("尝试强制终止Java进程: serviceId={}, javaPid={}", serviceId, javaPid);
+                forceKillProcess(javaPid);
+                Thread.sleep(2000);
+            }
             
-            // 首先尝试优雅关闭进程
-            log.info("尝试优雅关闭进程: serviceId={}, pid={}", serviceId, pid);
-            process.destroy();
-            
-            // 等待进程结束
-            boolean terminated = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
-            log.info("优雅关闭结果: serviceId={}, terminated={}, isAlive={}", serviceId, terminated, process.isAlive());
-            
-            if (!terminated) {
-                // 优雅关闭失败，强制终止进程
-                log.warn("优雅关闭失败，强制终止进程: serviceId={}", serviceId);
+            // 尝试强制终止cmd进程
+            if (process != null) {
+                log.warn("尝试强制终止cmd进程: serviceId={}", serviceId);
                 process.destroyForcibly();
-                boolean forceTerminated = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
-                log.info("强制终止结果: serviceId={}, terminated={}, isAlive={}", serviceId, forceTerminated, process.isAlive());
+                Thread.sleep(1000);
+                process.isAlive();
             }
             
-            // 如果进程仍然存活，尝试通过系统命令强制终止
-            if (process.isAlive() && pid > 0) {
-                log.warn("进程仍然存活，尝试通过系统命令强制终止: serviceId={}, pid={}", serviceId, pid);
-                forceKillProcess(pid);
-                
-                // 再次等待
-                process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
-            }
+            // 最终检查
+            boolean javaStillRunning = javaPid != null && javaPid > 0 && isProcessReallyRunning(javaPid);
+            boolean cmdStillRunning = process != null && process.isAlive();
             
-            // 如果进程仍然存活，尝试终止整个进程树
-            if (process.isAlive() && pid > 0) {
-                log.warn("进程仍然存活，尝试终止整个进程树: serviceId={}, pid={}", serviceId, pid);
-                forceKillProcessTree(pid);
-                
-                // 最后等待
-                process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
-            }
+            log.info("最终检查结果: serviceId={}, javaStillRunning={}, cmdStillRunning={}", 
+                serviceId, javaStillRunning, cmdStillRunning);
             
-            // 最终检查进程是否真的停止了
-            boolean isAlive = process.isAlive();
-            boolean isReallyRunning = isProcessReallyRunning(pid);
-            
-            log.info("最终检查结果: serviceId={}, pid={}, isAlive={}, isReallyRunning={}", 
-                serviceId, pid, isAlive, isReallyRunning);
-            
-            if (isAlive || isReallyRunning) {
-                log.error("无法停止Mock Server进程: serviceId={}, pid={}, isAlive={}, isReallyRunning={}", 
-                    serviceId, pid, isAlive, isReallyRunning);
-                // 即使进程没有停止，也要清理资源
+            if (javaStillRunning || cmdStillRunning) {
+                log.error("无法完全停止Mock Server进程: serviceId={}, javaStillRunning={}, cmdStillRunning={}", 
+                    serviceId, javaStillRunning, cmdStillRunning);
                 cleanupProcess(serviceId);
                 return false;
             } else {
                 log.info("Mock Server停止成功: serviceId={}", serviceId);
-                // 进程已停止，清理资源
                 cleanupProcess(serviceId);
                 return true;
             }
@@ -211,18 +201,31 @@ public class ProcessManagementService {
      * 检查服务是否正在运行
      */
     public boolean isServiceRunning(Long serviceId) {
+        Long javaPid = processIds.get(serviceId);
         Process process = runningProcesses.get(serviceId);
-        if (process == null) {
-            return false;
+        
+        // 优先检查Java进程是否在运行
+        if (javaPid != null && javaPid > 0) {
+            boolean javaRunning = isProcessReallyRunning(javaPid);
+            if (!javaRunning) {
+                // Java进程已停止，清理资源
+                cleanupProcess(serviceId);
+                return false;
+            }
+            return true;
         }
         
-        boolean alive = process.isAlive();
-        if (!alive) {
-            // 进程已经结束，清理资源
-            cleanupProcess(serviceId);
+        // 如果没有Java进程ID，检查cmd进程
+        if (process != null) {
+            boolean alive = process.isAlive();
+            if (!alive) {
+                // 进程已经结束，清理资源
+                cleanupProcess(serviceId);
+            }
+            return alive;
         }
         
-        return alive;
+        return false;
     }
     
     /**
@@ -248,18 +251,22 @@ public class ProcessManagementService {
         result.put("runningProcesses", runningProcesses.size());
         result.put("processIds", processIds.size());
         result.put("processLogs", processLogs.size());
+        result.put("servicePorts", servicePorts.size());
         
         Map<String, Object> services = new java.util.HashMap<>();
         for (Map.Entry<Long, Process> entry : runningProcesses.entrySet()) {
             Long serviceId = entry.getKey();
             Process process = entry.getValue();
             Long pid = processIds.get(serviceId);
+            Integer port = servicePorts.get(serviceId);
             
             Map<String, Object> serviceInfo = new java.util.HashMap<>();
             serviceInfo.put("serviceId", serviceId);
             serviceInfo.put("pid", pid);
+            serviceInfo.put("port", port);
             serviceInfo.put("isAlive", process.isAlive());
             serviceInfo.put("isReallyRunning", pid > 0 ? isProcessReallyRunning(pid) : false);
+            serviceInfo.put("portInUse", port != null ? isPortInUse(port) : false);
             
             services.put(serviceId.toString(), serviceInfo);
         }
@@ -322,6 +329,100 @@ public class ProcessManagementService {
     }
     
     /**
+     * 查找Java进程ID
+     */
+    private Long findJavaProcessId(Long serviceId, Integer port) {
+        try {
+            // 首先尝试通过netstat查找占用端口的进程
+            Long pidFromNetstat = findProcessIdByPort(port);
+            if (pidFromNetstat > 0) {
+                log.info("通过netstat找到端口 {} 对应的进程ID: {}", port, pidFromNetstat);
+                return pidFromNetstat;
+            }
+            
+            // 如果netstat没有找到，返回-1表示未找到进程
+            log.warn("暂未找到端口 {} 对应的Java进程", port);
+            return -1L;
+            
+        } catch (Exception e) {
+            log.error("查找Java进程ID时发生错误: serviceId={}, port={}", serviceId, port, e);
+            return -1L;
+        }
+    }
+    
+    /**
+     * 通过netstat命令查找占用指定端口的进程ID
+     */
+    private Long findProcessIdByPort(Integer port) {
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            String[] command;
+            
+            if (os.contains("win")) {
+                // Windows系统使用netstat -ano查找端口占用
+                command = new String[]{"cmd", "/c", "netstat", "-ano", "|", "findstr", ":" + port};
+            } else {
+                // Unix/Linux/Mac系统使用netstat -tulpn查找端口占用
+                command = new String[]{"netstat", "-tulpn", "|", "grep", ":" + port};
+            }
+            
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            Process process = processBuilder.start();
+            
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream())
+            );
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                log.debug("netstat输出: {}", line);
+                
+                if (os.contains("win")) {
+                    // Windows格式: TCP 0.0.0.0:8080 0.0.0.0:0 LISTENING 1234
+                    if (line.contains(":" + port) && line.contains("LISTENING")) {
+                        String[] parts = line.trim().split("\\s+");
+                        if (parts.length >= 5) {
+                            try {
+                                Long pid = Long.parseLong(parts[parts.length - 1]);
+                                log.info("通过netstat找到Windows进程ID: {} (端口: {})", pid, port);
+                                return pid;
+                            } catch (NumberFormatException e) {
+                                log.warn("无法解析Windows netstat进程ID: {}", parts[parts.length - 1]);
+                            }
+                        }
+                    }
+                } else {
+                    // Unix格式: tcp 0 0 0.0.0.0:8080 0.0.0.0:* LISTEN 1234/java
+                    if (line.contains(":" + port) && line.contains("LISTEN")) {
+                        String[] parts = line.trim().split("\\s+");
+                        if (parts.length >= 7) {
+                            String pidPart = parts[parts.length - 1];
+                            if (pidPart.contains("/")) {
+                                String pidStr = pidPart.split("/")[0];
+                                try {
+                                    Long pid = Long.parseLong(pidStr);
+                                    log.info("通过netstat找到Unix进程ID: {} (端口: {})", pid, port);
+                                    return pid;
+                                } catch (NumberFormatException e) {
+                                    log.warn("无法解析Unix netstat进程ID: {}", pidStr);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            process.waitFor();
+            log.debug("netstat未找到端口 {} 的占用进程", port);
+            return -1L;
+            
+        } catch (Exception e) {
+            log.error("通过netstat查找进程ID时发生错误: port={}", port, e);
+            return -1L;
+        }
+    }
+
+    /**
      * 启动日志收集线程
      */
     private void startLogCollector(Long serviceId, Process process) {
@@ -361,6 +462,7 @@ public class ProcessManagementService {
         runningProcesses.remove(serviceId);
         processIds.remove(serviceId);
         processLogs.remove(serviceId);
+        servicePorts.remove(serviceId);
     }
     
     /**
@@ -458,6 +560,57 @@ public class ProcessManagementService {
             
         } catch (Exception e) {
             log.error("检查进程是否运行时发生错误: pid={}", pid, e);
+            return false;
+        }
+    }
+    
+    /**
+     * 检查端口是否被占用（通过netstat命令）
+     */
+    private boolean isPortInUse(Integer port) {
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            String[] command;
+            
+            if (os.contains("win")) {
+                // Windows系统使用netstat -ano查找端口占用
+                command = new String[]{"cmd", "/c", "netstat", "-ano", "|", "findstr", ":" + port};
+            } else {
+                // Unix/Linux/Mac系统使用netstat -tulpn查找端口占用
+                command = new String[]{"netstat", "-tulpn", "|", "grep", ":" + port};
+            }
+            
+            ProcessBuilder processBuilder = new ProcessBuilder(command);
+            Process process = processBuilder.start();
+            
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream())
+            );
+            
+            String line;
+            boolean portInUse = false;
+            while ((line = reader.readLine()) != null) {
+                if (os.contains("win")) {
+                    // Windows格式: TCP 0.0.0.0:8080 0.0.0.0:0 LISTENING 1234
+                    if (line.contains(":" + port) && line.contains("LISTENING")) {
+                        portInUse = true;
+                        break;
+                    }
+                } else {
+                    // Unix格式: tcp 0 0 0.0.0.0:8080 0.0.0.0:* LISTEN 1234/java
+                    if (line.contains(":" + port) && line.contains("LISTEN")) {
+                        portInUse = true;
+                        break;
+                    }
+                }
+            }
+            
+            process.waitFor();
+            log.debug("端口 {} 占用状态: {}", port, portInUse);
+            return portInUse;
+            
+        } catch (Exception e) {
+            log.error("检查端口占用状态时发生错误: port={}", port, e);
             return false;
         }
     }
