@@ -6,8 +6,9 @@ import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.service.AiConfigService;
 import com.dbapp.dasmockserver.service.MockServerService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,6 +45,46 @@ public class WebController {
         return "index";
     }
     
+    /**
+     * 下载原始上传文档
+     */
+    @GetMapping("/service/{id}/download-document")
+    public ResponseEntity<Resource> downloadOriginalDocument(@PathVariable Long id) {
+        try {
+            MockService mockService = mockServerService.getMockServiceById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Service not found"));
+
+            // 构建上传目录: uploads/service-{id}/
+            String uploadRoot = System.getProperty("user.dir") + java.io.File.separator + "uploads";
+            Path serviceDir = Paths.get(uploadRoot, "service-" + mockService.getId());
+            if (!Files.exists(serviceDir) || !Files.isDirectory(serviceDir)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // 找到目录下的第一个文件作为原始文档
+            Path[] found = new Path[1];
+            try (java.util.stream.Stream<Path> stream = Files.list(serviceDir)) {
+                stream.filter(Files::isRegularFile).findFirst().ifPresent(p -> found[0] = p);
+            }
+            if (found[0] == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Resource resource = new FileSystemResource(found[0].toFile());
+            String fileName = found[0].getFileName().toString();
+            String encodedFileName;
+            encodedFileName = java.net.URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + encodedFileName + "\"; filename*=UTF-8''" + encodedFileName)
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     /**
      * 上传文档页面
      */

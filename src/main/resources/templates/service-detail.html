@@ -31,10 +31,15 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
             transform: translateY(-2px);
         }
-        .method-badge {
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
+         .method-badge {
+             font-size: 0.75rem;
+             font-weight: bold;
+             width: 70px;
+             min-width: 70px;
+             text-align: center;
+             display: inline-block;
+             padding: 4px 8px;
+         }
         .json-viewer {
             background-color: #f8f9fa;
             border-radius: 5px;
@@ -43,6 +48,81 @@
             font-size: 0.9rem;
             max-height: 200px;
             overflow-y: auto;
+        }
+         /* 端点标题对齐为网格 */
+         .endpoint-header-grid {
+             display: grid;
+             grid-template-columns: 80px minmax(0,1fr) minmax(0,1fr);
+             gap: 16px;
+             align-items: center;
+             width: 100%;
+             padding: 12px 16px;
+             box-sizing: border-box;
+         }
+        .accordion-header { display: flex; align-items: stretch; }
+        .accordion-header .accordion-button { flex: 1 1 auto; }
+        .header-actions-cell { width: 240px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 16px; }
+        .header-actions-cell .btn { white-space: nowrap; flex: 0 0 auto; }
+         .endpoint-header-grid .method-cell { 
+             justify-self: start; 
+             display: flex;
+             align-items: center;
+             min-height: 36px;
+         }
+         .endpoint-header-grid .path-cell { 
+             font-weight: 600; 
+             overflow: hidden; 
+             text-overflow: ellipsis; 
+             white-space: nowrap;
+             display: flex;
+             align-items: center;
+             min-height: 36px;
+         }
+         .endpoint-header-grid .name-cell { 
+             color: #6c757d; 
+             overflow: hidden; 
+             text-overflow: ellipsis; 
+             white-space: nowrap;
+             display: flex;
+             align-items: center;
+             min-height: 36px;
+         }
+         .endpoint-header-grid .actions-cell { 
+             justify-self: end; 
+             display: flex; 
+             gap: 8px; 
+             align-items: center;
+             justify-content: flex-end;
+             white-space: nowrap;
+             min-height: 36px;
+         }
+         .endpoint-header-grid .actions-cell .btn {
+             white-space: nowrap;
+             flex: 0 0 auto;
+         }
+
+        .header-actions { flex-wrap: nowrap; gap: 0.5rem; }
+        .header-actions .btn { font-size: 0.875rem; padding: 0.375rem 0.6rem; }
+        .accordion-button { 
+            align-items: center; 
+            min-height: 60px;
+            padding: 12px 16px;
+            display: block; /* 使内部grid按100%宽度布局，避免flex干扰 */
+            width: 100%;
+        }
+        .accordion-item .accordion-button { 
+            padding: 0; /* 由内部grid控制左右内边距，避免视觉偏移 */
+            border: none;
+            background: transparent;
+        }
+        .accordion-button::after { display: none; }
+        .accordion-item .accordion-button:not(.collapsed) {
+            background: #f8f9fa;
+            box-shadow: none;
+        }
+        .accordion-item .accordion-button:focus {
+            box-shadow: none;
+            border: none;
         }
         .status-indicator {
             width: 10px;
@@ -85,6 +165,7 @@
             position: relative;
             overflow: hidden;
         }
+        .btn { white-space: nowrap; }
 
         .btn:hover {
             transform: translateY(-1px);
@@ -316,6 +397,17 @@
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
 
+        /* URL输入框特殊样式 */
+        #testUrl {
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        
+        #testUrl:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+
         /* 卡片悬停效果 */
         .card {
             transition: all 0.3s ease;
@@ -402,6 +494,10 @@
             color: #495057;
             border-bottom: 1px solid #e9ecef;
         }
+        .card-header h5 { font-weight: 600; }
+        .accordion-item { border-radius: 10px; overflow: hidden; }
+        .accordion-item + .accordion-item { margin-top: 0.5rem; }
+        .accordion-button::after { transform: scale(0.9); }
 
         .btn-primary {
             background-color: #0d6efd;
@@ -424,41 +520,56 @@
             color: white;
         }
 
-        /* 响应式动画 */
-        @media (max-width: 768px) {
-            .endpoint-card:hover {
-                transform: none;
-            }
+         /* 响应式动画 */
+         @media (max-width: 768px) {
+             .header-actions { flex-wrap: wrap; }
+             .header-actions .btn { font-size: 0.85rem; }
+             .endpoint-card:hover {
+                 transform: none;
+             }
 
-            .card:hover {
-                transform: none;
-            }
+             .card:hover {
+                 transform: none;
+             }
 
-            .btn:hover {
-                transform: none;
-            }
+             .btn:hover {
+                 transform: none;
+             }
 
-            .modal-xl {
-                max-width: 95%;
-            }
+             .modal-xl {
+                 max-width: 95%;
+             }
 
-            /* 移动端单选框样式调整 */
-            .btn-group {
-                flex-direction: column;
-            }
+             /* 移动端单选框样式调整 */
+             .btn-group {
+                 flex-direction: column;
+             }
 
-            .btn-group .btn {
-                border-radius: 0.375rem !important;
-                margin-bottom: 2px;
-            }
+             .btn-group .btn {
+                 border-radius: 0.375rem !important;
+                 margin-bottom: 2px;
+             }
 
-            /* 移动端图标圆圈调整 */
-            .icon-circle {
-                width: 35px;
-                height: 35px;
-                font-size: 14px;
-            }
-        }
+             /* 移动端图标圆圈调整 */
+             .icon-circle {
+                 width: 35px;
+                 height: 35px;
+                 font-size: 14px;
+             }
+
+             /* 移动端端点列表调整 */
+             .endpoint-header-grid {
+                 grid-template-columns: 70px 1fr 1fr 150px;
+                 gap: 8px;
+                 padding: 0 8px;
+             }
+             
+             .method-badge {
+                 width: 60px;
+                 min-width: 60px;
+                 font-size: 0.7rem;
+             }
+         }
     </style>
 </head>
 <body class="fade-in">
@@ -524,27 +635,31 @@
             </div>
         </div>
         <div class="col-md-4 text-end">
-            <div class="d-flex gap-2 justify-content-end">
+            <div class="d-flex gap-2 justify-content-end header-actions">
                 <button th:if="${service.status == 'RUNNING'}"
                         th:data-service-id="${service.id}"
                         data-action="stop"
-                        class="btn btn-outline-warning action-btn">
-                    <i class="fas fa-stop me-1"></i>停止服务
+                        class="btn btn-outline-warning action-btn" title="停止服务">
+                    <i class="fas fa-stop me-1"></i><span class="d-none d-md-inline">停止服务</span>
                 </button>
                 <button th:if="${service.status != 'RUNNING'}"
                         th:data-service-id="${service.id}"
                         data-action="start"
-                        class="btn btn-outline-success action-btn">
-                    <i class="fas fa-play me-1"></i>启动服务
+                        class="btn btn-outline-success action-btn" title="启动服务">
+                    <i class="fas fa-play me-1"></i><span class="d-none d-md-inline">启动服务</span>
                 </button>
                 <button th:data-service-id="${service.id}"
                         data-action="regenerate"
-                        class="btn btn-outline-primary action-btn">
-                    <i class="fas fa-sync me-1"></i>重新生成
+                        class="btn btn-outline-primary action-btn" title="重新生成">
+                    <i class="fas fa-sync me-1"></i><span class="d-none d-md-inline">重新生成</span>
                 </button>
                 <a th:href="@{'/service/' + ${service.id} + '/download'}"
-                   class="btn btn-outline-info">
-                    <i class="fas fa-download me-1"></i>下载代码
+                   class="btn btn-outline-info" title="下载代码">
+                    <i class="fas fa-download me-1"></i><span class="d-none d-md-inline">下载代码</span>
+                </a>
+                <a th:href="@{'/service/' + ${service.id} + '/download-document'}"
+                   class="btn btn-outline-secondary" title="下载文档">
+                    <i class="fas fa-file-download me-1"></i><span class="d-none d-md-inline">下载文档</span>
                 </a>
             </div>
         </div>
@@ -594,37 +709,39 @@
 
             <div th:if="${!#lists.isEmpty(endpoints)}" class="accordion" id="endpointsAccordion">
                 <div th:each="endpoint, iterStat : ${endpoints}" class="accordion-item endpoint-card mb-3">
-                    <h2 class="accordion-header" th:id="'heading' + ${iterStat.index}">
-                        <button class="accordion-button collapsed" type="button"
+                    <h2 class="accordion-header d-flex" th:id="'heading' + ${iterStat.index}">
+                        <button class="accordion-button flex-grow-1 collapsed" type="button"
                                 th:data-bs-toggle="collapse"
                                 th:data-bs-target="'#collapse' + ${iterStat.index}">
-                            <div class="d-flex align-items-center w-100">
-                                    <span th:class="${'badge method-badge me-3 ' +
+                            <div class="endpoint-header-grid">
+                                <div class="method-cell">
+                                    <span th:class="${'badge method-badge ' +
                                         (endpoint.method == 'GET' ? 'bg-success' :
                                          endpoint.method == 'POST' ? 'bg-primary' :
                                          endpoint.method == 'PUT' ? 'bg-warning' :
                                          endpoint.method == 'DELETE' ? 'bg-danger' : 'bg-secondary')}"
                                           th:text="${endpoint.method}">GET</span>
-                                <span class="fw-bold me-3" th:text="${endpoint.path}">/api/endpoint</span>
-                                <span class="text-muted" th:text="${endpoint.name}">端点名称</span>
-                                <div class="ms-auto">
-                                    <button class="btn btn-sm btn-outline-primary me-2"
-                                            th:data-endpoint-id="${endpoint.id}"
-                                            onclick="editEndpoint(this.getAttribute('data-endpoint-id'))">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-info"
-                                            th:data-endpoint-id="${endpoint.id}"
-                                            th:data-endpoint-path="${endpoint.path}"
-                                            th:data-endpoint-method="${endpoint.method}"
-                                            th:data-test-request-body="${endpoint.testRequestBody}"
-                                            th:data-endpoint-headers="${endpoint.headers}"
-                                            onclick="testEndpoint(this.getAttribute('data-endpoint-id'), this.getAttribute('data-endpoint-path'), this.getAttribute('data-endpoint-method'), this.getAttribute('data-test-request-body'), this.getAttribute('data-endpoint-headers'))">
-                                        <i class="fas fa-play"></i>
-                                    </button>
                                 </div>
+                                <div class="path-cell" th:text="${endpoint.path}">/api/endpoint</div>
+                                <div class="name-cell" th:text="${endpoint.name}">端点名称</div>
                             </div>
                         </button>
+                        <div class="header-actions-cell">
+                            <button class="btn btn-sm btn-outline-primary me-1"
+                                    th:data-endpoint-id="${endpoint.id}"
+                                    onclick="editEndpoint(this.getAttribute('data-endpoint-id'))">
+                                <i class="fas fa-edit me-1"></i><span class="d-none d-lg-inline">编辑</span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-info"
+                                    th:data-endpoint-id="${endpoint.id}"
+                                    th:data-endpoint-path="${endpoint.path}"
+                                    th:data-endpoint-method="${endpoint.method}"
+                                    th:data-test-request-body="${endpoint.testRequestBody}"
+                                    th:data-endpoint-headers="${endpoint.headers}"
+                                    onclick="testEndpoint(this.getAttribute('data-endpoint-id'), this.getAttribute('data-endpoint-path'), this.getAttribute('data-endpoint-method'), this.getAttribute('data-test-request-body'), this.getAttribute('data-endpoint-headers'))">
+                                <i class="fas fa-play me-1"></i><span class="d-none d-lg-inline">测试</span>
+                            </button>
+                        </div>
                     </h2>
                     <div th:id="'collapse' + ${iterStat.index}"
                          class="accordion-collapse collapse"
@@ -705,7 +822,10 @@
                                                 <span class="input-group-text bg-light">
                                                     <i class="fas fa-globe text-muted"></i>
                                                 </span>
-                                                <input type="text" class="form-control" id="testUrl" readonly>
+                                                <input type="text" class="form-control" id="testUrl" placeholder="可编辑URL，支持路径变量">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="restoreOriginalUrl()" title="恢复原始URL">
+                                                    <i class="fas fa-undo"></i>
+                                                </button>
                                             </div>
                                         </div>
                                         <div class="col-4">
@@ -1312,7 +1432,13 @@
 
     function testEndpoint(endpointId, path, method, testRequestBody, headersStr) {
         const baseUrl = document.getElementById('serviceBaseUrl').value;
-        document.getElementById('testUrl').value = `${baseUrl}${path}`;
+        const originalUrl = `${baseUrl}${path}`;
+        const testUrlInput = document.getElementById('testUrl');
+        
+        // 保存原始URL到data属性
+        testUrlInput.setAttribute('data-original-url', originalUrl);
+        testUrlInput.value = originalUrl;
+        testUrlInput.title = `原始URL: ${originalUrl}\n可编辑以测试不同的路径变量值`;
         document.getElementById('testMethod').value = method;
         document.getElementById('testResponse').textContent = '点击测试按钮发送请求...';
 
@@ -1659,6 +1785,16 @@
         return params.toString();
     }
 
+    // 恢复原始URL
+    function restoreOriginalUrl() {
+        const testUrlInput = document.getElementById('testUrl');
+        const originalUrl = testUrlInput.getAttribute('data-original-url');
+        if (originalUrl) {
+            testUrlInput.value = originalUrl;
+            testUrlInput.title = `原始URL: ${originalUrl}\n可编辑以测试不同的路径变量值`;
+        }
+    }
+
     // 清空测试数据
     function clearTestData() {
         // 清空请求头
@@ -1710,6 +1846,17 @@
 
         // 清空响应
         document.getElementById('testResponse').textContent = '点击测试按钮发送请求...';
+        
+        // 恢复URL输入框到原始URL
+        const testUrlInput = document.getElementById('testUrl');
+        const originalUrl = testUrlInput.getAttribute('data-original-url');
+        if (originalUrl) {
+            testUrlInput.value = originalUrl;
+            testUrlInput.title = `原始URL: ${originalUrl}\n可编辑以测试不同的路径变量值`;
+        } else {
+            testUrlInput.value = '';
+            testUrlInput.title = '';
+        }
         
         // 隐藏测试数据提示
         document.getElementById('testDataHint').style.display = 'none';

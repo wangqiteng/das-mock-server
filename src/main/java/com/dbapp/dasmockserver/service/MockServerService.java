@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,9 @@ public class MockServerService {
     
     @Autowired
     private NetworkUtil networkUtil;
+
+    @Value("${app.file.upload.path:./uploads/}")
+    private String uploadRootPath;
     
     /**
      * 创建新的Mock服务
@@ -81,6 +85,19 @@ public class MockServerService {
         mockService.setDocumentType(getFileExtension(file.getOriginalFilename()));
         mockService.setStatus(MockService.ServiceStatus.GENERATING);
         mockService = mockServiceRepository.save(mockService);
+
+        // 保存原始上传文件到磁盘: uploads/service-{id}/<originalFilename>
+        try {
+            java.nio.file.Path serviceDir = java.nio.file.Paths.get(uploadRootPath, "service-" + mockService.getId());
+            java.nio.file.Files.createDirectories(serviceDir);
+            String originalFilename = Optional.ofNullable(file.getOriginalFilename()).orElse("uploaded." + mockService.getDocumentType());
+            java.nio.file.Path target = serviceDir.resolve(originalFilename);
+            try (java.io.InputStream in = file.getInputStream()) {
+                java.nio.file.Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (Exception e) {
+            log.warn("保存原始上传文件失败，将继续生成: {}", e.getMessage());
+        }
         
         try {
             // 临时设置AI配置用于本次生成
