@@ -1,26 +1,24 @@
 package com.dbapp.dasmockserver.service;
 
-import com.dbapp.dasmockserver.config.AiConfig;
 import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.repository.ApiEndpointRepository;
 import com.dbapp.dasmockserver.repository.MockServiceRepository;
 import com.dbapp.dasmockserver.util.NetworkUtil;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import java.util.*;
+
+import static com.dbapp.dasmockserver.service.AiCodeGenerationService.temporaryConfig;
 
 @Service
 @Transactional
@@ -109,6 +107,12 @@ public class MockServerService {
                     String testRequestBody = aiCodeGenerationService.generateTestRequestBody(endpoint);
                     endpoint.setTestRequestBody(testRequestBody);
                 }
+
+                // 当端点包含认证信息时，自动生成用于测试的请求头
+                Map<String, String> testHeaders = buildTestAuthHeaders(endpoint);
+                if (testHeaders != null && !testHeaders.isEmpty()) {
+                    endpoint.setHeaders(testHeaders);
+                }
                 
                 apiEndpointRepository.save(endpoint);
             }
@@ -120,12 +124,18 @@ public class MockServerService {
             log.info("Mock服务生成成功，项目路径: {},访问路径: {}", projectPath,mockService.getBaseUrl());
             mockService.setStatus(MockService.ServiceStatus.CREATED);
             mockServiceRepository.save(mockService);
-            
+
+            // 清除临时AI配置
+            if (temporaryConfig.get() != null) {
+                temporaryConfig.remove();
+            }
+
             return mockService;
             
         } catch (Exception e) {
             mockService.setStatus(MockService.ServiceStatus.ERROR);
             mockServiceRepository.save(mockService);
+            log.error("生成Mock服务失败: {}", e.getMessage(),e);
             throw new RuntimeException("生成Mock服务失败: " + e.getMessage(), e);
         }
     }
@@ -380,5 +390,68 @@ public class MockServerService {
                 .distinct()
                 .sorted()
                 .toList();
+    }
+
+    /**
+     * 构建用于测试的认证请求头
+     */
+    private Map<String, String> buildTestAuthHeaders(ApiEndpoint endpoint) {
+        try {
+            String authConfigJson = endpoint.getAuthConfig();
+            if (authConfigJson == null || authConfigJson.trim().isEmpty() || "{}".equals(authConfigJson)) {
+                return Map.of();
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(authConfigJson);
+            String type = root.path("type").asText("NONE").toUpperCase();
+
+            Map<String, String> headers = new HashMap<>();
+
+            switch (type) {
+                case "API_KEY": {
+                    JsonNode apiKey = root.path("apiKey");
+                    String keyName = apiKey.path("keyName").asText("X-API-Key");
+                    String location = apiKey.path("location").asText("header");
+                    String demoValue = "demo-api-key-123";
+                    if ("header".equalsIgnoreCase(location)) {
+                        headers.put(keyName, demoValue);
+                    } else if ("query".equalsIgnoreCase(location)) {
+                        // 对于query类型，这里无法放入header，保留提示性头，前端可据此拼query
+                        headers.put("X-Demo-ApiKey-In-Query", keyName + "=" + demoValue);
+                    }
+                    break;
+                }
+                case "BEARER_TOKEN": {
+                    JsonNode bearer = root.path("bearerToken");
+                    String headerName = bearer.path("headerName").asText("Authorization");
+                    String token = "demo.jwt.token";
+                    headers.put(headerName, "Bearer " + token);
+                    break;
+                }
+                case "BASIC_AUTH": {
+                    JsonNode basic = root.path("basicAuth");
+                    String username = basic.path("username").asText("user");
+                    String password = basic.path("password").asText("password");
+                    String encoded = Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
+                    headers.put("Authorization", "Basic " + encoded);
+                    break;
+                }
+                case "OAUTH2": {
+                    // 测试场景下提供占位token
+                    headers.put("Authorization", "Bearer demo-oauth2-token");
+                    break;
+                }
+                default: {
+                    // 无认证
+                    return Map.of();
+                }
+            }
+
+            return headers;
+        } catch (Exception e) {
+            log.warn("根据authConfig生成测试请求头失败: {}", e.getMessage());
+            return Map.of();
+        }
     }
 } 

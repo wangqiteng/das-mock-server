@@ -3,12 +3,14 @@ package com.dbapp.dasmockserver.service;
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import com.dbapp.dasmockserver.config.AiConfig;
 import com.dbapp.dasmockserver.model.ApiEndpoint;
-import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.model.ApiEndpoint.HttpMethod;
+import com.dbapp.dasmockserver.model.MockService;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -16,20 +18,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 import static com.dbapp.dasmockserver.config.AiConfig.DEFAULT_PROMPT;
 
@@ -52,11 +50,14 @@ public class AiCodeGenerationService {
     @Value("${hengNao.secret:}")
     private String secret;
 
-    
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    // json解析设置为宽松模式：允许不带引号的字段名，允许单引号
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
+            .configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true);
+
     
     // 临时AI配置，用于单次生成
-    private ThreadLocal<AiConfig.AiModelConfig> temporaryConfig = new ThreadLocal<>();
+    public static ThreadLocal<AiConfig.AiModelConfig> temporaryConfig = new ThreadLocal<>();
     
     /**
      * 设置临时AI配置（仅用于当前线程的本次生成）
@@ -227,6 +228,14 @@ public class AiCodeGenerationService {
                         endpoint.setResponseSchema("{}");
                     }
 
+                    // 解析认证配置
+                    JsonNode authConfig = endpointNode.get("authConfig");
+                    if (authConfig != null) {
+                        endpoint.setAuthConfig(authConfig.toString());
+                    } else {
+                        endpoint.setAuthConfig("{}");
+                    }
+
                     // 设置默认值
                     endpoint.setMockResponse("{}");
                     endpoint.setResponseDelay(0);
@@ -267,7 +276,7 @@ public class AiCodeGenerationService {
             }
             jsonText = jsonText.replaceAll("`", "").replaceAll("\n", "")
                     .replaceAll("\\\\\"", "'").replaceAll("\\\\","");
-            jsonContent = jsonText.substring(4);
+            jsonContent = jsonText;
         }
         return jsonContent;
     }
@@ -310,8 +319,9 @@ public class AiCodeGenerationService {
      */
     private String buildApiAnalysisPrompt(String documentContent) {
         return String.format("""
-            请分析以下API文档内容，提取所有API端点信息。请以JSON格式返回结果，格式如下：
-            {
+            请分析以下API文档内容，提取所有API端点信息。无论存在几个端点，请均以JSON数组格式返回结果，多个端点通过逗号分隔。
+            JSON格式如下：
+            [{
                 "name": "端点名称",
                 "path": "/api/endpoint",
                 "method": "GET|POST|PUT|DELETE|PATCH",
@@ -362,8 +372,34 @@ public class AiCodeGenerationService {
                 },
                 "responseSchema": {
                     // 响应参数JSON Schema
+                },
+                "authConfig": {
+                    "type": "API_KEY|BEARER_TOKEN|BASIC_AUTH|OAUTH2|NONE",
+                    "name": "认证名称",
+                    "description": "认证描述",
+                    "apiKey": {
+                        "keyName": "X-API-Key",
+                        "location": "header|query",
+                        "description": "API Key描述"
+                    },
+                    "bearerToken": {
+                        "headerName": "Authorization",
+                        "description": "Bearer Token描述"
+                    },
+                    "basicAuth": {
+                        "username": "用户名",
+                        "password": "密码",
+                        "description": "Basic Auth描述"
+                    },
+                    "oauth2": {
+                        "authorizationUrl": "授权URL",
+                        "tokenUrl": "令牌URL",
+                        "scopes": ["scope1", "scope2"],
+                        "flow": "authorizationCode|clientCredentials|password|implicit",
+                        "description": "OAuth2描述"
+                    }
                 }
-            }
+            }]
             
             文档内容：
             %s
@@ -404,6 +440,13 @@ public class AiCodeGenerationService {
                 - 根据字段名称推断数据类型（如：name->string, age->integer, isActive->boolean）
                 - 为每个字段提供合理的示例值
                 - 确保必填字段标记为required: true
+            17. 认证信息分析：
+                - 如果文档中提到"API Key"、"X-API-Key"、"apikey"等，使用API_KEY类型
+                - 如果文档中提到"Bearer Token"、"Authorization"、"JWT"等，使用BEARER_TOKEN类型
+                - 如果文档中提到"Basic Auth"、"用户名密码"、"HTTP Basic"等，使用BASIC_AUTH类型
+                - 如果文档中提到"OAuth"、"OAuth2"、"授权码"等，使用OAUTH2类型
+                - 如果文档中没有明确的认证要求，使用NONE类型
+                - 根据文档内容填写相应的认证配置参数
             
             请确保：
             1. 准确识别HTTP方法和路径
@@ -525,10 +568,6 @@ public class AiCodeGenerationService {
         // 使用动态配置调用AI
         String response = callAiWithDynamicConfig(prompt);
 
-        // 清除临时配置
-        if (temporaryConfig.get() != null) {
-            clearTemporaryAiConfig();
-        }
         // 清理响应，移除markdown格式
         return cleanMockResponse(response);
     }
@@ -894,6 +933,14 @@ public class AiCodeGenerationService {
                         endpoint.setResponseSchema(responseSchema.toString());
                     } else {
                         endpoint.setResponseSchema("{}");
+                    }
+
+                    // 解析认证配置
+                    JsonNode authConfig = endpointNode.get("authConfig");
+                    if (authConfig != null) {
+                        endpoint.setAuthConfig(authConfig.toString());
+                    } else {
+                        endpoint.setAuthConfig("{}");
                     }
                     
                     // 设置默认值

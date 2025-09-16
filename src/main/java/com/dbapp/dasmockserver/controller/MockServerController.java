@@ -172,6 +172,7 @@ public class MockServerController {
         boolean stopped = mockServerService.stopMockService(id);
         if(stopped){
             mockServerService.deleteMockService(id);
+            log.error("删除服务成功: id={}", id);
         }
         return ResponseEntity.noContent().build();
     }

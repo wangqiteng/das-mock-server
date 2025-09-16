@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -42,6 +43,9 @@ public class ApiEndpoint {
     
     @Column(columnDefinition = "TEXT")
     private String testRequestBody;
+    
+    @Column(columnDefinition = "TEXT")
+    private String authConfig;
     
     private Integer responseDelay;
     
@@ -153,6 +157,14 @@ public class ApiEndpoint {
     
     public void setTestRequestBody(String testRequestBody) {
         this.testRequestBody = testRequestBody;
+    }
+    
+    public String getAuthConfig() {
+        return authConfig;
+    }
+    
+    public void setAuthConfig(String authConfig) {
+        this.authConfig = authConfig;
     }
     
     public Integer getResponseDelay() {

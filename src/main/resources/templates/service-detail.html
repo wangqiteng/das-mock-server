@@ -618,7 +618,8 @@
                                             th:data-endpoint-path="${endpoint.path}"
                                             th:data-endpoint-method="${endpoint.method}"
                                             th:data-test-request-body="${endpoint.testRequestBody}"
-                                            onclick="testEndpoint(this.getAttribute('data-endpoint-id'), this.getAttribute('data-endpoint-path'), this.getAttribute('data-endpoint-method'), this.getAttribute('data-test-request-body'))">
+                                            th:data-endpoint-headers="${endpoint.headers}"
+                                            onclick="testEndpoint(this.getAttribute('data-endpoint-id'), this.getAttribute('data-endpoint-path'), this.getAttribute('data-endpoint-method'), this.getAttribute('data-test-request-body'), this.getAttribute('data-endpoint-headers'))">
                                         <i class="fas fa-play"></i>
                                     </button>
                                 </div>
@@ -1309,7 +1310,7 @@
         window.location.href = `/endpoint/${endpointId}/edit`;
     }
 
-    function testEndpoint(endpointId, path, method, testRequestBody) {
+    function testEndpoint(endpointId, path, method, testRequestBody, headersStr) {
         const baseUrl = document.getElementById('serviceBaseUrl').value;
         document.getElementById('testUrl').value = `${baseUrl}${path}`;
         document.getElementById('testMethod').value = method;
@@ -1355,6 +1356,61 @@
                 toggleBodyInput();
                 document.getElementById('rawType').value = 'application/json';
                 document.getElementById('rawBody').value = testRequestBody;
+            }
+        }
+
+        // 预填充请求头（来自endpoint.headers）
+        if (headersStr && headersStr.trim() !== '') {
+            try {
+                let headersObj = null;
+                // 优先尝试JSON
+                if (headersStr.trim().startsWith('{') && headersStr.includes(':')) {
+                    headersObj = JSON.parse(headersStr);
+                }
+                // 兼容Thymeleaf Map默认toString: {key=value, key2=value2}
+                if (!headersObj && headersStr.trim().startsWith('{') && headersStr.includes('=')) {
+                    headersObj = {};
+                    const inner = headersStr.trim().slice(1, -1); // 去掉花括号
+                    if (inner.trim().length > 0) {
+                        inner.split(',').forEach(pair => {
+                            const idx = pair.indexOf('=');
+                            if (idx > -1) {
+                                const name = pair.slice(0, idx).trim();
+                                const value = pair.slice(idx + 1).trim();
+                                if (name) headersObj[name] = value;
+                            }
+                        });
+                    }
+                }
+                if (headersObj) {
+                    const existingRows = document.querySelectorAll('#headersContainer .header-row');
+                    let usedFirst = false;
+                    Object.keys(headersObj).forEach((key) => {
+                        const value = headersObj[key];
+                        if (!usedFirst && existingRows.length > 0) {
+                            const firstRow = existingRows[0];
+                            const nameInput = firstRow.querySelector('input[name="headerName"]');
+                            const valueInput = firstRow.querySelector('input[name="headerValue"]');
+                            if (nameInput && valueInput) {
+                                nameInput.value = key;
+                                valueInput.value = value;
+                                usedFirst = true;
+                                return;
+                            }
+                        }
+                        addHeader();
+                        const rows = document.querySelectorAll('#headersContainer .header-row');
+                        const last = rows[rows.length - 1];
+                        const nameInput = last.querySelector('input[name="headerName"]');
+                        const valueInput = last.querySelector('input[name="headerValue"]');
+                        if (nameInput && valueInput) {
+                            nameInput.value = key;
+                            valueInput.value = value;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('解析并预填headers失败:', e);
             }
         }
 

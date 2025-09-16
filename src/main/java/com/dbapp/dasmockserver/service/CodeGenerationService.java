@@ -1,29 +1,22 @@
 package com.dbapp.dasmockserver.service;
 
 import com.dbapp.dasmockserver.model.ApiEndpoint;
+import com.dbapp.dasmockserver.model.AuthConfig;
+import com.dbapp.dasmockserver.model.AuthType;
 import com.dbapp.dasmockserver.model.MockService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.squareup.javapoet.*;
-import com.squareup.javapoet.ParameterizedTypeName;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import jakarta.validation.constraints.NotNull;
 
 import javax.lang.model.element.Modifier;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -270,6 +263,10 @@ public class CodeGenerationService {
         
         // 生成详细的参数日志
         generateDetailedParameterLog(methodBuilder, endpoint, parameterInfo);
+        
+        // 生成认证相关代码
+        AuthConfig authConfig = parseAuthConfig(endpoint.getAuthConfig());
+        generateAuthCode(methodBuilder, authConfig);
         
         // 添加响应延迟
         if (endpoint.getResponseDelay() != null && endpoint.getResponseDelay() > 0) {
@@ -1566,5 +1563,367 @@ public class CodeGenerationService {
         if (typeString.contains("Float") || typeString.contains("float")) return "float";
         if (typeString.contains("Boolean") || typeString.contains("boolean")) return "boolean";
         return "string";
+    }
+    
+    /**
+     * 解析认证配置
+     */
+    private AuthConfig parseAuthConfig(String authConfigJson) {
+        if (authConfigJson == null || authConfigJson.trim().isEmpty() || "{}".equals(authConfigJson)) {
+            return new AuthConfig(AuthType.NONE);
+        }
+        
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode authNode = mapper.readTree(authConfigJson);
+            
+            AuthConfig authConfig = new AuthConfig();
+            
+            // 解析认证类型
+            String typeStr = getStringValue(authNode, "type", "NONE");
+            authConfig.setType(AuthType.fromString(typeStr));
+            
+            // 解析基本信息
+            authConfig.setName(getStringValue(authNode, "name", ""));
+            authConfig.setDescription(getStringValue(authNode, "description", ""));
+            
+            // 根据认证类型解析具体配置
+            switch (authConfig.getType()) {
+                case API_KEY:
+                    parseApiKeyConfig(authNode, authConfig);
+                    break;
+                case BEARER_TOKEN:
+                    parseBearerTokenConfig(authNode, authConfig);
+                    break;
+                case BASIC_AUTH:
+                    parseBasicAuthConfig(authNode, authConfig);
+                    break;
+                case OAUTH2:
+                    parseOAuth2Config(authNode, authConfig);
+                    break;
+                default:
+                    // NONE类型，不需要额外配置
+                    break;
+            }
+            
+            return authConfig;
+        } catch (Exception e) {
+            log.warn("解析认证配置失败: {}", e.getMessage());
+            return new AuthConfig(AuthType.NONE);
+        }
+    }
+    
+    /**
+     * 解析API Key配置
+     */
+    private void parseApiKeyConfig(JsonNode authNode, AuthConfig authConfig) {
+        JsonNode apiKeyNode = authNode.get("apiKey");
+        if (apiKeyNode != null) {
+            AuthConfig.ApiKeyConfig apiKeyConfig = new AuthConfig.ApiKeyConfig();
+            apiKeyConfig.setKeyName(getStringValue(apiKeyNode, "keyName", "X-API-Key"));
+            apiKeyConfig.setLocation(getStringValue(apiKeyNode, "location", "header"));
+            apiKeyConfig.setDescription(getStringValue(apiKeyNode, "description", ""));
+            authConfig.setApiKey(apiKeyConfig);
+        }
+    }
+    
+    /**
+     * 解析Bearer Token配置
+     */
+    private void parseBearerTokenConfig(JsonNode authNode, AuthConfig authConfig) {
+        JsonNode bearerTokenNode = authNode.get("bearerToken");
+        if (bearerTokenNode != null) {
+            AuthConfig.BearerTokenConfig bearerTokenConfig = new AuthConfig.BearerTokenConfig();
+            bearerTokenConfig.setHeaderName(getStringValue(bearerTokenNode, "headerName", "Authorization"));
+            bearerTokenConfig.setDescription(getStringValue(bearerTokenNode, "description", ""));
+            authConfig.setBearerToken(bearerTokenConfig);
+        }
+    }
+    
+    /**
+     * 解析Basic Auth配置
+     */
+    private void parseBasicAuthConfig(JsonNode authNode, AuthConfig authConfig) {
+        JsonNode basicAuthNode = authNode.get("basicAuth");
+        if (basicAuthNode != null) {
+            AuthConfig.BasicAuthConfig basicAuthConfig = new AuthConfig.BasicAuthConfig();
+            basicAuthConfig.setUsername(getStringValue(basicAuthNode, "username", ""));
+            basicAuthConfig.setPassword(getStringValue(basicAuthNode, "password", ""));
+            basicAuthConfig.setDescription(getStringValue(basicAuthNode, "description", ""));
+            authConfig.setBasicAuth(basicAuthConfig);
+        }
+    }
+    
+    /**
+     * 解析OAuth2配置
+     */
+    private void parseOAuth2Config(JsonNode authNode, AuthConfig authConfig) {
+        JsonNode oauth2Node = authNode.get("oauth2");
+        if (oauth2Node != null) {
+            AuthConfig.OAuth2Config oauth2Config = new AuthConfig.OAuth2Config();
+            oauth2Config.setAuthorizationUrl(getStringValue(oauth2Node, "authorizationUrl", ""));
+            oauth2Config.setTokenUrl(getStringValue(oauth2Node, "tokenUrl", ""));
+            oauth2Config.setFlow(getStringValue(oauth2Node, "flow", "authorizationCode"));
+            oauth2Config.setDescription(getStringValue(oauth2Node, "description", ""));
+            
+            // 解析scopes数组
+            JsonNode scopesNode = oauth2Node.get("scopes");
+            if (scopesNode != null && scopesNode.isArray()) {
+                List<String> scopes = new ArrayList<>();
+                for (JsonNode scopeNode : scopesNode) {
+                    scopes.add(scopeNode.asText());
+                }
+                oauth2Config.setScopes(scopes.toArray(new String[0]));
+            }
+            
+            authConfig.setOauth2(oauth2Config);
+        }
+    }
+    
+    /**
+     * 从JsonNode获取字符串值
+     */
+    private String getStringValue(JsonNode node, String fieldName, String defaultValue) {
+        if (node != null && node.has(fieldName)) {
+            return node.get(fieldName).asText();
+        }
+        return defaultValue;
+    }
+    
+    /**
+     * 生成认证相关的代码
+     */
+    private void generateAuthCode(MethodSpec.Builder methodBuilder, AuthConfig authConfig) {
+        if (authConfig == null || authConfig.getType() == AuthType.NONE) {
+            return;
+        }
+        
+        switch (authConfig.getType()) {
+            case API_KEY:
+                generateApiKeyAuthCode(methodBuilder, authConfig.getApiKey());
+                break;
+            case BEARER_TOKEN:
+                generateBearerTokenAuthCode(methodBuilder, authConfig.getBearerToken());
+                break;
+            case BASIC_AUTH:
+                generateBasicAuthCode(methodBuilder, authConfig.getBasicAuth());
+                break;
+            case OAUTH2:
+                generateOAuth2AuthCode(methodBuilder, authConfig.getOauth2());
+                break;
+        }
+    }
+    
+    /**
+     * 生成API Key认证代码
+     */
+    private void generateApiKeyAuthCode(MethodSpec.Builder methodBuilder, AuthConfig.ApiKeyConfig apiKeyConfig) {
+        if (apiKeyConfig == null) return;
+        
+        String keyName = apiKeyConfig.getKeyName() != null ? apiKeyConfig.getKeyName() : "X-API-Key";
+        String location = apiKeyConfig.getLocation() != null ? apiKeyConfig.getLocation() : "header";
+        
+        if ("header".equals(location)) {
+            // 添加Header参数
+            methodBuilder.addParameter(
+                ParameterSpec.builder(String.class, "apiKey")
+                    .addAnnotation(AnnotationSpec.builder(
+                        ClassName.get("org.springframework.web.bind.annotation", "RequestHeader"))
+                        .addMember("value", "$S", keyName)
+                        .addMember("required", "$L", false)
+                        .build())
+                    .build()
+            );
+            
+            methodBuilder.addStatement("logger.info($S + $S + $S + $L)", "API Key认证 - Header: ", keyName, " = ", "apiKey");
+            
+            // 添加认证验证逻辑
+            CodeBlock authBlock = CodeBlock.builder()
+                .add("if (apiKey == null || apiKey.trim().isEmpty()) {\n")
+                .add("  logger.warn($S);\n", "API Key缺失")
+                .add("  return $T.of($S, $S);\n", 
+                    ClassName.get("java.util", "Map"),
+                    "error", "API Key is required")
+                .add("}\n")
+                .add("// TODO: 实现API Key验证逻辑\n")
+                .add("logger.info($S + $L);\n", "API Key验证通过: ", "apiKey")
+                .build();
+            methodBuilder.addCode(authBlock);
+            
+        } else if ("query".equals(location)) {
+            // 添加Query参数
+            methodBuilder.addParameter(
+                ParameterSpec.builder(String.class, "apiKey")
+                    .addAnnotation(AnnotationSpec.builder(
+                        ClassName.get("org.springframework.web.bind.annotation", "RequestParam"))
+                        .addMember("value", "$S", keyName)
+                        .addMember("required", "$L", false)
+                        .build())
+                    .build()
+            );
+            
+            methodBuilder.addStatement("logger.info($S + $S + $S + $L)", "API Key认证 - Query参数: ", keyName, " = ", "apiKey");
+            
+            // 添加认证验证逻辑
+            CodeBlock authBlock = CodeBlock.builder()
+                .add("if (apiKey == null || apiKey.trim().isEmpty()) {\n")
+                .add("  logger.warn($S);\n", "API Key缺失")
+                .add("  return $T.of($S, $S);\n", 
+                    ClassName.get("java.util", "Map"),
+                    "error", "API Key is required")
+                .add("}\n")
+                .add("// TODO: 实现API Key验证逻辑\n")
+                .add("logger.info($S + $L);\n", "API Key验证通过: ", "apiKey")
+                .build();
+            methodBuilder.addCode(authBlock);
+        }
+    }
+    
+    /**
+     * 生成Bearer Token认证代码
+     */
+    private void generateBearerTokenAuthCode(MethodSpec.Builder methodBuilder, AuthConfig.BearerTokenConfig bearerTokenConfig) {
+        if (bearerTokenConfig == null) return;
+        
+        String headerName = bearerTokenConfig.getHeaderName() != null ? bearerTokenConfig.getHeaderName() : "Authorization";
+        
+        // 添加Authorization Header参数
+        methodBuilder.addParameter(
+            ParameterSpec.builder(String.class, "authorization")
+                .addAnnotation(AnnotationSpec.builder(
+                    ClassName.get("org.springframework.web.bind.annotation", "RequestHeader"))
+                    .addMember("value", "$S", headerName)
+                    .addMember("required", "$L", false)
+                    .build())
+                .build()
+        );
+        
+        methodBuilder.addStatement("logger.info($S + $S + $S + $L)", "Bearer Token认证 - Header: ", headerName, " = ", "authorization");
+        
+        // 添加认证验证逻辑
+        CodeBlock authBlock = CodeBlock.builder()
+            .add("if (authorization == null || authorization.trim().isEmpty()) {\n")
+            .add("  logger.warn($S);\n", "Authorization Header缺失")
+            .add("  return $T.of($S, $S);\n", 
+                ClassName.get("java.util", "Map"),
+                "error", "Authorization header is required")
+            .add("}\n")
+            .add("if (!authorization.startsWith($S)) {\n", "Bearer ")
+            .add("  logger.warn($S + $L);\n", "Invalid Bearer Token format: ", "authorization")
+            .add("  return $T.of($S, $S);\n", 
+                ClassName.get("java.util", "Map"),
+                "error", "Invalid Bearer Token format")
+            .add("}\n")
+            .add("String token = authorization.substring(7); // 移除'Bearer '前缀\n")
+            .add("// TODO: 实现JWT Token验证逻辑\n")
+            .add("logger.info($S + $L);\n", "Bearer Token验证通过: ", "token")
+            .build();
+        methodBuilder.addCode(authBlock);
+    }
+    
+    /**
+     * 生成Basic Auth认证代码
+     */
+    private void generateBasicAuthCode(MethodSpec.Builder methodBuilder, AuthConfig.BasicAuthConfig basicAuthConfig) {
+        if (basicAuthConfig == null) return;
+        
+        // 添加Authorization Header参数
+        methodBuilder.addParameter(
+            ParameterSpec.builder(String.class, "authorization")
+                .addAnnotation(AnnotationSpec.builder(
+                    ClassName.get("org.springframework.web.bind.annotation", "RequestHeader"))
+                    .addMember("value", "$S", "Authorization")
+                    .addMember("required", "$L", false)
+                    .build())
+                .build()
+        );
+
+        methodBuilder.addStatement("logger.info($S + $S + $L)", "Basic Auth认证 - Header: Authorization = ", "authorization", "authorization");
+        
+        // 添加认证验证逻辑
+        CodeBlock authBlock = CodeBlock.builder()
+            .add("if (authorization == null || authorization.trim().isEmpty()) {\n")
+            .add("  logger.warn($S);\n", "Authorization Header缺失")
+            .add("  return $T.of($S, $S);\n", 
+                ClassName.get("java.util", "Map"),
+                "error", "Authorization header is required")
+            .add("}\n")
+            .add("if (!authorization.startsWith($S)) {\n", "Basic ")
+            .add("  logger.warn($S + $L);\n", "Invalid Basic Auth format: ", "authorization")
+            .add("  return $T.of($S, $S);\n", 
+                ClassName.get("java.util", "Map"),
+                "error", "Invalid Basic Auth format")
+            .add("}\n")
+            .add("try {\n")
+            .add("  String base64Credentials = authorization.substring(6); // 移除'Basic '前缀\n")
+            .add("  String credentials = new $T($T.getDecoder().decode(base64Credentials)).toString();\n",
+                ClassName.get("java.lang", "String"),
+                ClassName.get("java.util", "Base64"))
+            .add("  String[] values = credentials.split($S, 2);\n", ":")
+            .add("  if (values.length != 2) {\n")
+            .add("    logger.warn($S);\n", "Invalid Basic Auth credentials format")
+            .add("    return $T.of($S, $S);\n", 
+                ClassName.get("java.util", "Map"),
+                "error", "Invalid Basic Auth credentials format")
+            .add("  }\n")
+            .add("  String username = values[0];\n")
+            .add("  String password = values[1];\n")
+            .add("  // TODO: 实现用户名密码验证逻辑\n")
+            .add("  logger.info($S + $L + $S + $L);\n", "Basic Auth验证通过 - 用户名: ", "username", ", 密码: ", "password")
+            .add("} catch ($T e) {\n", ClassName.get("java.lang", "Exception"))
+            .add("  logger.error($S + e.getMessage());\n", "Basic Auth解析失败: ")
+            .add("  return $T.of($S, $S);\n", 
+                ClassName.get("java.util", "Map"),
+                "error", "Basic Auth parsing failed")
+            .add("}\n")
+            .build();
+        methodBuilder.addCode(authBlock);
+    }
+    
+    /**
+     * 生成OAuth2认证代码
+     */
+    private void generateOAuth2AuthCode(MethodSpec.Builder methodBuilder, AuthConfig.OAuth2Config oauth2Config) {
+        if (oauth2Config == null) return;
+        
+        String flow = oauth2Config.getFlow() != null ? oauth2Config.getFlow() : "authorizationCode";
+        
+        // 添加Authorization Header参数
+        methodBuilder.addParameter(
+            ParameterSpec.builder(String.class, "authorization")
+                .addAnnotation(AnnotationSpec.builder(
+                    ClassName.get("org.springframework.web.bind.annotation", "RequestHeader"))
+                    .addMember("value", "$S", "Authorization")
+                    .addMember("required", "$L", false)
+                    .build())
+                .build()
+        );
+        
+        methodBuilder.addStatement("logger.info($S + $S + $S + $L)", "OAuth2认证 - Flow: ", flow, ", Header: Authorization = ", "authorization");
+        
+        // 添加认证验证逻辑
+        CodeBlock authBlock = CodeBlock.builder()
+            .add("if (authorization == null || authorization.trim().isEmpty()) {\n")
+            .add("  logger.warn($S);\n", "Authorization Header缺失")
+            .add("  return $T.of($S, $S);\n", 
+                ClassName.get("java.util", "Map"),
+                "error", "Authorization header is required")
+            .add("}\n")
+            .add("if (!authorization.startsWith($S)) {\n", "Bearer ")
+            .add("  logger.warn($S + $L);\n", "Invalid OAuth2 Token format: ", "authorization")
+            .add("  return $T.of($S, $S);\n", 
+                ClassName.get("java.util", "Map"),
+                "error", "Invalid OAuth2 Token format")
+            .add("}\n")
+            .add("String accessToken = authorization.substring(7); // 移除'Bearer '前缀\n")
+            .add("// TODO: 实现OAuth2 Token验证逻辑\n")
+            .add("// 根据Flow类型进行不同的验证:\n")
+            .add("// - authorizationCode: 验证授权码流程的访问令牌\n")
+            .add("// - clientCredentials: 验证客户端凭据流程的访问令牌\n")
+            .add("// - password: 验证密码流程的访问令牌\n")
+            .add("// - implicit: 验证隐式流程的访问令牌\n")
+            .add("logger.info($S + $S + $S + $L);\n", "OAuth2 Token验证通过 - Flow: ", flow, ", Token: ", "accessToken")
+            .build();
+        methodBuilder.addCode(authBlock);
     }
 } 
