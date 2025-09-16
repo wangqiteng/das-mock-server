@@ -3,6 +3,8 @@ package com.dbapp.dasmockserver.controller;
 import com.dbapp.dasmockserver.model.ApiEndpoint;
 import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.service.MockServerService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -16,8 +18,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/mock-server")
@@ -130,14 +130,7 @@ public class MockServerController {
             log.info("开始更新端点: id={}, name={}, path={}", id, updatedEndpoint.getName(), updatedEndpoint.getPath());
             
             // 验证输入参数
-            if (updatedEndpoint == null) {
-                log.error("更新端点的请求体为空");
-                return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "error", "请求体不能为空"
-                ));
-            }
-            
+
             if (id == null) {
                 log.error("端点ID为空");
                 return ResponseEntity.badRequest().body(Map.of(
@@ -172,10 +165,14 @@ public class MockServerController {
     
     /**
      * 删除Mock服务
+     * 先停止后删除
      */
     @DeleteMapping("/services/{id}")
     public ResponseEntity<Void> deleteMockService(@PathVariable Long id) {
-        mockServerService.deleteMockService(id);
+        boolean stopped = mockServerService.stopMockService(id);
+        if(stopped){
+            mockServerService.deleteMockService(id);
+        }
         return ResponseEntity.noContent().build();
     }
     
