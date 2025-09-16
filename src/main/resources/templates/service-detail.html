@@ -31,15 +31,17 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
             transform: translateY(-2px);
         }
-         .method-badge {
-             font-size: 0.75rem;
-             font-weight: bold;
-             width: 70px;
-             min-width: 70px;
-             text-align: center;
-             display: inline-block;
-             padding: 4px 8px;
-         }
+        
+        .method-badge {
+            font-size: 0.75rem;
+            font-weight: bold;
+            width: 70px;
+            min-width: 70px;
+            text-align: center;
+            display: inline-block;
+            padding: 4px 8px;
+        }
+        
         .json-viewer {
             background-color: #f8f9fa;
             border-radius: 5px;
@@ -49,69 +51,73 @@
             max-height: 200px;
             overflow-y: auto;
         }
-         /* 端点标题对齐为网格 */
-         .endpoint-header-grid {
-             display: grid;
-             grid-template-columns: 80px minmax(0,1fr) minmax(0,1fr);
-             gap: 16px;
-             align-items: center;
-             width: 100%;
-             padding: 12px 16px;
-             box-sizing: border-box;
-         }
+        
+        /* 端点标题对齐为网格 */
+        .endpoint-header-grid {
+            display: grid;
+            grid-template-columns: 80px minmax(0,1fr) minmax(0,1fr);
+            gap: 16px;
+            align-items: center;
+            width: 100%;
+            padding: 12px 16px;
+            box-sizing: border-box;
+        }
+        
         .accordion-header { display: flex; align-items: stretch; }
         .accordion-header .accordion-button { flex: 1 1 auto; }
         .header-actions-cell { width: 240px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-right: 16px; }
         .header-actions-cell .btn { white-space: nowrap; flex: 0 0 auto; }
-         .endpoint-header-grid .method-cell { 
-             justify-self: start; 
-             display: flex;
-             align-items: center;
-             min-height: 36px;
-         }
-         .endpoint-header-grid .path-cell { 
-             font-weight: 600; 
-             overflow: hidden; 
-             text-overflow: ellipsis; 
-             white-space: nowrap;
-             display: flex;
-             align-items: center;
-             min-height: 36px;
-         }
-         .endpoint-header-grid .name-cell { 
-             color: #6c757d; 
-             overflow: hidden; 
-             text-overflow: ellipsis; 
-             white-space: nowrap;
-             display: flex;
-             align-items: center;
-             min-height: 36px;
-         }
-         .endpoint-header-grid .actions-cell { 
-             justify-self: end; 
-             display: flex; 
-             gap: 8px; 
-             align-items: center;
-             justify-content: flex-end;
-             white-space: nowrap;
-             min-height: 36px;
-         }
-         .endpoint-header-grid .actions-cell .btn {
-             white-space: nowrap;
-             flex: 0 0 auto;
-         }
+        
+        .endpoint-header-grid .method-cell { 
+            justify-self: start; 
+            display: flex;
+            align-items: center;
+            min-height: 36px;
+        }
+        .endpoint-header-grid .path-cell { 
+            font-weight: 600; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            min-height: 36px;
+        }
+        .endpoint-header-grid .name-cell { 
+            color: #6c757d; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            min-height: 36px;
+        }
+        .endpoint-header-grid .actions-cell { 
+            justify-self: end; 
+            display: flex; 
+            gap: 8px; 
+            align-items: center;
+            justify-content: flex-end;
+            white-space: nowrap;
+            min-height: 36px;
+        }
+        .endpoint-header-grid .actions-cell .btn {
+            white-space: nowrap;
+            flex: 0 0 auto;
+        }
 
         .header-actions { flex-wrap: nowrap; gap: 0.5rem; }
         .header-actions .btn { font-size: 0.875rem; padding: 0.375rem 0.6rem; }
+        
         .accordion-button { 
             align-items: center; 
             min-height: 60px;
             padding: 12px 16px;
-            display: block; /* 使内部grid按100%宽度布局，避免flex干扰 */
+            display: block;
             width: 100%;
         }
         .accordion-item .accordion-button { 
-            padding: 0; /* 由内部grid控制左右内边距，避免视觉偏移 */
+            padding: 0;
             border: none;
             background: transparent;
         }
@@ -124,127 +130,26 @@
             box-shadow: none;
             border: none;
         }
-        .status-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 5px;
-        }
-
-        /* 固定菜单项宽度，防止位置变化 */
-        .navbar-nav .nav-item {
-            min-width: 100px;
-            text-align: center;
-        }
-
-        .navbar-nav .nav-link {
-            white-space: nowrap;
-            padding: 0.5rem 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .navbar-nav .nav-link:hover {
-            transform: translateY(-1px);
-            color: #667eea !important;
-        }
-
-        /* 确保导航栏布局稳定 */
-        .navbar-collapse {
-            flex-grow: 1;
-        }
-
-        .navbar-nav {
-            width: 100%;
-            justify-content: flex-start;
-        }
 
         /* 按钮动画效果 */
         .btn {
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+            white-space: nowrap;
         }
-        .btn { white-space: nowrap; }
 
         .btn:hover {
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .btn:active {
-            transform: translateY(0);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            transition: width 0.4s ease, height 0.4s ease;
-        }
-
-        .btn:active::before {
-            width: 200px;
-            height: 200px;
-        }
-
         /* 卡片动画效果 */
         .card {
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
         }
 
         .card:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.03), transparent);
-            transition: left 0.6s ease;
-        }
-
-        .card:hover::before {
-            left: 100%;
-        }
-
-        /* 状态徽章动画 */
-        .badge {
-            transition: all 0.3s ease;
-        }
-
-        .badge.bg-success {
-            animation: successPulse 2s infinite;
-        }
-
-        .badge.bg-danger {
-            animation: errorPulse 2s infinite;
-        }
-
-        @keyframes successPulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-        }
-
-        @keyframes errorPulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
-            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
         }
 
         /* 页面加载动画 */
@@ -257,16 +162,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Toast通知动画 */
-        .toast {
-            animation: slideInRight 0.3s ease-out;
-        }
-
-        @keyframes slideInRight {
-            from { opacity: 0; transform: translateX(50px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
         /* 测试模态框样式 */
         .modal-xl {
             max-width: 1200px;
@@ -274,27 +169,21 @@
 
         .header-row, .form-data-row, .url-encoded-row {
             transition: all 0.3s ease;
-        }
-
-        .header-row:hover, .form-data-row:hover, .url-encoded-row:hover {
-            background-color: #f8f9fa;
             border-radius: 5px;
             padding: 5px;
         }
 
-        .body-content {
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 15px;
+        .header-row:hover, .form-data-row:hover, .url-encoded-row:hover {
             background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
         }
 
-        .json-viewer {
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            line-height: 1.4;
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        .body-content {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            margin-top: 10px;
         }
 
         /* 请求体类型单选框样式优化 */
@@ -328,27 +217,6 @@
             transform: scale(0.95);
         }
 
-        /* 表单字段行样式优化 */
-        .header-row, .form-data-row, .url-encoded-row {
-            transition: all 0.2s ease;
-            border-radius: 5px;
-            padding: 5px;
-        }
-
-        .header-row:hover, .form-data-row:hover, .url-encoded-row:hover {
-            background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
-        }
-
-        /* 请求体内容区域样式 */
-        .body-content {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            margin-top: 10px;
-        }
-
         /* 测试模态框样式 */
         .test-modal .modal-content {
             border: none;
@@ -377,15 +245,6 @@
             font-size: 16px;
         }
 
-        /* 颜色主题 */
-        .text-purple {
-            color: #6f42c1 !important;
-        }
-
-        .bg-purple {
-            background-color: #6f42c1 !important;
-        }
-
         /* 表单字段优化 */
         .form-control:focus {
             border-color: #667eea;
@@ -399,32 +258,62 @@
 
         /* URL输入框特殊样式 */
         #testUrl {
-            font-family: 'Courier New', monospace;
-            font-size: 0.875rem;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.3;
+            padding: 0.4rem 0.5rem;
+            word-break: break-all;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         #testUrl:focus {
             border-color: #28a745;
             box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+            white-space: normal;
+            word-break: break-all;
+            overflow: visible;
+            text-overflow: unset;
         }
 
-        /* 卡片悬停效果 */
-        .card {
-            transition: all 0.3s ease;
+        /* 方法徽章样式 */
+        .method-badge-display {
+            min-width: 60px;
+            font-weight: bold;
+            font-size: 0.75rem;
+            text-align: center;
+            border-right: 1px solid #dee2e6;
         }
 
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        .method-badge-display.get {
+            background-color: #d4edda !important;
+            color: #155724 !important;
+            border-color: #c3e6cb !important;
         }
 
-        /* 按钮组优化 */
-        .btn-group .btn {
-            transition: all 0.3s ease;
+        .method-badge-display.post {
+            background-color: #cce5ff !important;
+            color: #004085 !important;
+            border-color: #b3d7ff !important;
         }
 
-        .btn-group .btn:hover {
-            transform: translateY(-1px);
+        .method-badge-display.put {
+            background-color: #fff3cd !important;
+            color: #856404 !important;
+            border-color: #ffeaa7 !important;
+        }
+
+        .method-badge-display.delete {
+            background-color: #f8d7da !important;
+            color: #721c24 !important;
+            border-color: #f5c6cb !important;
+        }
+
+        .method-badge-display.patch {
+            background-color: #e2e3e5 !important;
+            color: #383d41 !important;
+            border-color: #d6d8db !important;
         }
 
         /* 紧凑布局优化 */
@@ -457,8 +346,13 @@
             margin-top: 0.5rem;
         }
 
-        /* 响应内容区域优化 */
-        .test-modal .json-viewer {
+        /* 响应内容区域优化 - 1:1布局 */
+        .test-modal .col-md-6 {
+            min-height: calc(90vh - 200px);
+        }
+
+        /* 格式化响应展示 */
+        .response-viewer {
             font-family: 'Courier New', monospace;
             font-size: 0.875rem;
             line-height: 1.5;
@@ -467,15 +361,37 @@
             background-color: #f8f9fa;
             border: 1px solid #e9ecef;
             border-radius: 0.375rem;
+            padding: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
         }
 
-        /* 确保响应内容区域充分利用空间 */
-        .test-modal .col-md-7 {
-            min-height: calc(90vh - 200px);
+        .response-status {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
         }
 
-        .test-modal .col-md-5 {
-            min-height: calc(90vh - 200px);
+        .response-status.success {
+            color: #28a745;
+        }
+
+        .response-status.error {
+            color: #dc3545;
+        }
+
+        .response-headers {
+            background-color: #e9ecef;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .response-body {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 0.75rem;
         }
 
         /* 服务标题样式 */
@@ -520,56 +436,302 @@
             color: white;
         }
 
-         /* 响应式动画 */
-         @media (max-width: 768px) {
-             .header-actions { flex-wrap: wrap; }
-             .header-actions .btn { font-size: 0.85rem; }
-             .endpoint-card:hover {
-                 transform: none;
-             }
+        /* 测试模态框优化 */
+        .test-modal .modal-dialog {
+            max-width: 95vw;
+            width: 95vw;
+            height: 95vh;
+            margin: 2.5vh auto;
+        }
 
-             .card:hover {
-                 transform: none;
-             }
+        .test-modal .modal-content {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
 
-             .btn:hover {
-                 transform: none;
-             }
+        .test-modal .modal-body {
+            flex: 1;
+            overflow: hidden;
+            padding: 0;
+        }
 
-             .modal-xl {
-                 max-width: 95%;
-             }
+        .test-modal .row.g-0.h-100 {
+            height: 100%;
+        }
 
-             /* 移动端单选框样式调整 */
-             .btn-group {
-                 flex-direction: column;
-             }
+        .test-modal .col-md-6 {
+            height: 100%;
+            overflow: hidden;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+        }
 
-             .btn-group .btn {
-                 border-radius: 0.375rem !important;
-                 margin-bottom: 2px;
-             }
+        /* Raw Content 区域优化 */
+        .test-modal #rawBody {
+            min-height: 120px;
+            max-height: 200px;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
 
-             /* 移动端图标圆圈调整 */
-             .icon-circle {
-                 width: 35px;
-                 height: 35px;
-                 font-size: 14px;
-             }
+        /* 响应结果面板美化 */
+        .response-panel {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 10px;
+            padding: 0.75rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
 
-             /* 移动端端点列表调整 */
-             .endpoint-header-grid {
-                 grid-template-columns: 70px 1fr 1fr 150px;
-                 gap: 8px;
-                 padding: 0 8px;
-             }
-             
-             .method-badge {
-                 width: 60px;
-                 min-width: 60px;
-                 font-size: 0.7rem;
-             }
-         }
+        .response-header {
+            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 2px 4px rgba(74, 144, 226, 0.2);
+        }
+
+        .response-header h6 {
+            margin: 0;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .response-header i {
+            margin-right: 0.4rem;
+            font-size: 1em;
+        }
+
+        .response-content {
+            flex: 1;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            min-height: 0;
+        }
+
+        .response-viewer {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: #f8f9fa;
+            border: none;
+            border-radius: 0;
+            padding: 1.25rem;
+            max-height: none;
+            height: 100%;
+            overflow-y: auto;
+            color: #2c3e50;
+        }
+
+        .response-status {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            padding: 0.2rem 0.5rem 0.2rem 0.3rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            text-align: left;
+            position: relative;
+            margin-left: 0;
+            margin-right: 0;
+            line-height: 1.2;
+            min-height: auto;
+        }
+
+        .response-status.success {
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+            color: #0d5016;
+            border-left: 3px solid #28a745;
+        }
+
+        .response-status.error {
+            background: linear-gradient(135deg, #fdf2f2 0%, #f8d7da 100%);
+            color: #721c24;
+            border-left: 3px solid #dc3545;
+        }
+
+        .response-headers {
+            background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+            padding: 0.2rem 0.5rem 0.2rem 0.3rem;
+            border-radius: 3px;
+            margin-bottom: 0.25rem;
+            font-size: 0.7rem;
+            border-left: 3px solid #4a90e2;
+        }
+
+        .response-headers h6 {
+            margin: 0 0 0.15rem 0;
+            color: #2d3748;
+            font-weight: 600;
+            font-size: 0.75rem;
+            line-height: 1.2;
+        }
+
+        .response-headers .header-item {
+            margin: 0.1rem 0;
+            padding: 0.1rem 0.25rem;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 2px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-size: 0.65rem;
+            line-height: 1.1;
+            color: #4a5568;
+        }
+
+        .response-body {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .response-body h6 {
+            margin: 0;
+            padding: 0.2rem 0.5rem 0.2rem 0.3rem;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-bottom: 1px solid #e2e8f0;
+            color: #2d3748;
+            font-weight: 600;
+            font-size: 0.75rem;
+            line-height: 1.2;
+        }
+
+        .response-body pre {
+            margin: 0;
+            padding: 0.5rem 0.75rem 0.5rem 0.3rem;
+            background: #fafbfc;
+            border: none;
+            border-radius: 0;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: #2d3748;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: none;
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        /* JSON 语法高亮效果 */
+        .response-body pre.json-content {
+            background: #f8f9fa;
+            position: relative;
+        }
+
+        .response-body pre.json-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);
+        }
+
+        /* 请求配置区域优化 */
+        .request-config {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 10px;
+            padding: 0.75rem;
+            height: 100%;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .request-config .card {
+            border: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .request-config .card-header {
+            background: linear-gradient(135deg, #e6f3ff 0%, #cce7ff 100%);
+            border-bottom: 1px solid #4a90e2;
+            border-radius: 8px 8px 0 0 !important;
+        }
+
+        .request-config .card-header h6 {
+            color: #2c5282;
+            font-weight: 600;
+        }
+
+        /* 响应式布局 */
+        @media (max-width: 768px) {
+            .header-actions { flex-wrap: wrap; }
+            .header-actions .btn { font-size: 0.85rem; }
+            .endpoint-card:hover {
+                transform: none;
+            }
+
+            .card:hover {
+                transform: none;
+            }
+
+            .btn:hover {
+                transform: none;
+            }
+
+            .test-modal .modal-dialog {
+                max-width: 98vw;
+                width: 98vw;
+                height: 98vh;
+                margin: 1vh auto;
+            }
+
+            .test-modal .col-md-6 {
+                padding: 0.75rem;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn-group .btn {
+                border-radius: 0.375rem !important;
+                margin-bottom: 2px;
+            }
+
+            .icon-circle {
+                width: 35px;
+                height: 35px;
+                font-size: 14px;
+            }
+
+            .endpoint-header-grid {
+                grid-template-columns: 70px 1fr 1fr 150px;
+                gap: 8px;
+                padding: 0 8px;
+            }
+            
+            .method-badge {
+                width: 60px;
+                min-width: 60px;
+                font-size: 0.7rem;
+            }
+
+            .test-modal #rawBody {
+                min-height: 100px;
+                max-height: 150px;
+            }
+        }
     </style>
 </head>
 <body class="fade-in">
@@ -793,8 +955,8 @@
              <div class="modal-body p-0" style="max-height: calc(90vh - 120px); overflow-y: auto;">
                  <div class="row g-0 h-100">
                      <!-- 左侧：请求配置 -->
-                     <div class="col-md-5 border-end">
-                         <div class="p-3">
+                     <div class="col-md-6 border-end">
+                         <div class="request-config">
                             <div class="d-flex align-items-center mb-3">
                                 <div class="icon-circle bg-primary text-white me-2" style="width: 32px; height: 32px; font-size: 14px;">
                                     <i class="fas fa-cog"></i>
@@ -814,11 +976,14 @@
                                 </div>
                                 <div class="card-body py-2">
                                     <div class="row">
-                                        <div class="col-8">
+                                        <div class="col-12">
                                             <label class="form-label fw-semibold small">
                                                 <i class="fas fa-link me-1 text-primary"></i>请求URL
                                             </label>
                                             <div class="input-group input-group-sm">
+                                                <span class="input-group-text bg-light method-badge-display" id="methodBadge" style="min-width: 60px; font-weight: bold; font-size: 0.75rem;">
+                                                    GET
+                                                </span>
                                                 <span class="input-group-text bg-light">
                                                     <i class="fas fa-globe text-muted"></i>
                                                 </span>
@@ -826,17 +991,6 @@
                                                 <button class="btn btn-outline-secondary" type="button" onclick="restoreOriginalUrl()" title="恢复原始URL">
                                                     <i class="fas fa-undo"></i>
                                                 </button>
-                                            </div>
-                                        </div>
-                                        <div class="col-4">
-                                            <label class="form-label fw-semibold small">
-                                                <i class="fas fa-exchange-alt me-1 text-success"></i>方法
-                                            </label>
-                                            <div class="input-group input-group-sm">
-                                                <span class="input-group-text bg-light">
-                                                    <i class="fas fa-code text-muted"></i>
-                                                </span>
-                                                <input type="text" class="form-control" id="testMethod" readonly>
                                             </div>
                                         </div>
                                     </div>
@@ -986,27 +1140,17 @@
                     </div>
 
                      <!-- 右侧：响应结果 -->
-                     <div class="col-md-7">
-                         <div class="p-3 h-100 d-flex flex-column">
-                             <div class="d-flex align-items-center mb-3">
-                                 <div class="icon-circle bg-success text-white me-2" style="width: 32px; height: 32px; font-size: 14px;">
-                                     <i class="fas fa-reply"></i>
-                                 </div>
-                                 <div>
-                                     <h6 class="mb-0 fw-bold text-success">响应结果</h6>
-                                     <small class="text-muted">查看请求响应和状态</small>
-                                 </div>
+                     <div class="col-md-6">
+                         <div class="response-panel">
+                             <div class="response-header">
+                                 <h6>
+                                     <i class="fas fa-reply"></i>响应结果
+                                 </h6>
+                                 <small class="opacity-75">查看请求响应和状态</small>
                              </div>
-                             <div class="card flex-grow-1 d-flex flex-column">
-                                 <div class="card-header bg-light py-2">
-                                     <h6 class="mb-0 fw-bold">
-                                         <i class="fas fa-terminal me-2 text-dark"></i>响应内容
-                                     </h6>
-                                 </div>
-                                 <div class="card-body p-0 flex-grow-1">
-                                     <div class="json-viewer p-3" id="testResponse" style="height: 100%; overflow-y: auto; min-height: 400px;">
-                                         点击测试按钮发送请求...
-                                     </div>
+                             <div class="response-content">
+                                 <div class="response-viewer" id="testResponse">
+                                     点击测试按钮发送请求...
                                  </div>
                              </div>
                          </div>
@@ -1195,11 +1339,7 @@
     }
 
     function startService(serviceId) {
-        console.log('startService called with serviceId:', serviceId);
-
-        // 查找启动按钮
         const startButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="start"]`);
-        console.log('Found start button:', startButton);
 
         if (startButton) {
             const originalText = startButton.innerHTML;
@@ -1222,12 +1362,10 @@
                     showToast('error', '启动错误', '启动服务时发生错误: ' + error.message);
                 })
                 .finally(() => {
-                    // 恢复按钮状态
                     startButton.innerHTML = originalText;
                     startButton.disabled = false;
                 });
         } else {
-            // 如果找不到按钮，直接执行启动操作
             fetch(`/api/mock-server/services/${serviceId}/start`, {
                 method: 'POST'
             })
@@ -1247,27 +1385,18 @@
     }
 
     function stopService(serviceId) {
-        console.log('stopService called with serviceId:', serviceId);
-
-        // 查找停止按钮
         const stopButton = document.querySelector(`button[data-service-id="${serviceId}"][data-action="stop"]`);
-        console.log('Found stop button:', stopButton);
 
         if (stopButton) {
             const originalText = stopButton.innerHTML;
             stopButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>停止中...';
             stopButton.disabled = true;
 
-            console.log('Sending stop request for serviceId:', serviceId);
             fetch(`/api/mock-server/services/${serviceId}/stop`, {
                 method: 'POST'
             })
-                .then(response => {
-                    console.log('Stop response status:', response.status);
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log('Stop response data:', data);
                     if (data.success) {
                         showToast('success', '停止成功', 'Mock服务已成功停止！');
                         updateServiceStatus(serviceId, 'STOPPED');
@@ -1276,26 +1405,18 @@
                     }
                 })
                 .catch(error => {
-                    console.error('Stop service error:', error);
                     showToast('error', '停止错误', '停止服务时发生错误: ' + error.message);
                 })
                 .finally(() => {
-                    // 恢复按钮状态
                     stopButton.innerHTML = originalText;
                     stopButton.disabled = false;
                 });
         } else {
-            console.log('Stop button not found, executing stop operation directly');
-            // 如果找不到按钮，直接执行停止操作
             fetch(`/api/mock-server/services/${serviceId}/stop`, {
                 method: 'POST'
             })
-                .then(response => {
-                    console.log('Direct stop response status:', response.status);
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log('Direct stop response data:', data);
                     if (data.success) {
                         showToast('success', '停止成功', 'Mock服务已成功停止！');
                         updateServiceStatus(serviceId, 'STOPPED');
@@ -1304,15 +1425,12 @@
                     }
                 })
                 .catch(error => {
-                    console.error('Direct stop service error:', error);
                     showToast('error', '停止错误', '停止服务时发生错误: ' + error.message);
                 });
         }
     }
 
     function updateServiceStatus(serviceId, newStatus) {
-        console.log('updateServiceStatus called with serviceId:', serviceId, 'newStatus:', newStatus);
-
         // 更新状态徽章
         const statusBadge = document.querySelector('.status-badge');
         if (statusBadge) {
@@ -1326,8 +1444,6 @@
         // 更新按钮
         const buttonContainer = document.querySelector('.d-flex.gap-2.justify-content-end');
         if (buttonContainer) {
-            console.log('Found button container:', buttonContainer);
-
             // 查找所有可能的启动和停止按钮
             const allButtons = buttonContainer.querySelectorAll('button');
             let startButton = null;
@@ -1344,55 +1460,32 @@
                 }
             });
 
-            console.log('Found start button:', startButton);
-            console.log('Found stop button:', stopButton);
-
             // 移除现有的启动和停止按钮
-            if (startButton) {
-                console.log('Removing start button');
-                startButton.remove();
-            }
-            if (stopButton) {
-                console.log('Removing stop button');
-                stopButton.remove();
-            }
+            if (startButton) startButton.remove();
+            if (stopButton) stopButton.remove();
 
             // 创建新的按钮
             if (newStatus === 'RUNNING') {
-                // 创建停止按钮
                 const newStopButton = document.createElement('button');
                 newStopButton.className = 'btn btn-outline-warning action-btn';
                 newStopButton.setAttribute('data-service-id', serviceId);
                 newStopButton.setAttribute('data-action', 'stop');
                 newStopButton.innerHTML = '<i class="fas fa-stop me-1"></i>停止服务';
-
-                // 插入到第一个位置
                 buttonContainer.insertBefore(newStopButton, buttonContainer.firstChild);
-                console.log('Created new stop button');
             } else {
-                // 创建启动按钮
                 const newStartButton = document.createElement('button');
                 newStartButton.className = 'btn btn-outline-success action-btn';
                 newStartButton.setAttribute('data-service-id', serviceId);
                 newStartButton.setAttribute('data-action', 'start');
                 newStartButton.innerHTML = '<i class="fas fa-play me-1"></i>启动服务';
-
-                // 插入到第一个位置
                 buttonContainer.insertBefore(newStartButton, buttonContainer.firstChild);
-                console.log('Created new start button');
             }
-        } else {
-            console.log('Button container not found');
         }
 
         // 更新服务访问信息卡片
         const accessInfoCard = document.querySelector('.card[th\\:if*="service.status == \'RUNNING\'"]');
         if (accessInfoCard) {
-            if (newStatus === 'RUNNING') {
-                accessInfoCard.style.display = 'block';
-            } else {
-                accessInfoCard.style.display = 'none';
-            }
+            accessInfoCard.style.display = newStatus === 'RUNNING' ? 'block' : 'none';
         }
     }
 
@@ -1439,8 +1532,11 @@
         testUrlInput.setAttribute('data-original-url', originalUrl);
         testUrlInput.value = originalUrl;
         testUrlInput.title = `原始URL: ${originalUrl}\n可编辑以测试不同的路径变量值`;
-        document.getElementById('testMethod').value = method;
-        document.getElementById('testResponse').textContent = '点击测试按钮发送请求...';
+        // 更新方法徽章显示
+        const methodBadge = document.getElementById('methodBadge');
+        methodBadge.textContent = method;
+        methodBadge.className = 'input-group-text bg-light method-badge-display ' + method.toLowerCase();
+        document.getElementById('testResponse').innerHTML = '<div style="text-align: center; color: #6c757d; padding: 2rem;"><i class="fas fa-play-circle fa-2x mb-3"></i><br>点击测试按钮发送请求...</div>';
 
         // 重置表单
         clearTestData();
@@ -1546,12 +1642,12 @@
 
     function sendTestRequest() {
         const url = document.getElementById('testUrl').value;
-        const method = document.getElementById('testMethod').value;
+        const method = document.getElementById('methodBadge').textContent;
         const responseDiv = document.getElementById('testResponse');
         const selectedBodyType = document.querySelector('input[name="bodyType"]:checked');
         const bodyType = selectedBodyType ? selectedBodyType.value : 'none';
 
-        responseDiv.textContent = '正在发送请求...';
+        responseDiv.innerHTML = '<div style="text-align: center; color: #0d6efd; padding: 2rem;"><i class="fas fa-spinner fa-spin fa-2x mb-3"></i><br>正在发送请求...</div>';
 
         // 构建请求配置
         const requestConfig = {
@@ -1609,33 +1705,51 @@
         // 发送请求
         fetch(url, requestConfig)
             .then(response => {
-                // 构建响应信息
-                let responseText = `状态码: ${response.status} ${response.statusText}\n`;
-                responseText += `响应头:\n`;
+                // 构建格式化的响应信息
+                let responseHtml = '';
+                
+                // 状态码
+                const statusClass = response.ok ? 'success' : 'error';
+                responseHtml += `<div class="response-status ${statusClass}">状态码: ${response.status} ${response.statusText}
+                </div>`;
+                
+                // 响应头
+                responseHtml += `<div class="response-headers">
+                    <h6><i class="fas fa-headers me-2"></i>响应头</h6>`;
                 response.headers.forEach((value, key) => {
-                    responseText += `  ${key}: ${value}\n`;
+                    responseHtml += `<div class="header-item"><strong>${key}:</strong> ${value}</div>`;
                 });
-                responseText += `\n响应体:\n`;
-
+                responseHtml += '</div>';
+                
+                // 响应体
+                responseHtml += '<div class="response-body">';
+                
                 // 尝试解析响应体
                 const contentType = response.headers.get('content-type');
                 if (contentType && contentType.includes('application/json')) {
                     return response.json().then(data => {
-                        responseText += JSON.stringify(data, null, 2);
-                        return responseText;
+                        responseHtml += `<h6><i class="fas fa-code me-2"></i>响应体 (JSON)</h6>`;
+                        responseHtml += `<pre class="json-content">${JSON.stringify(data, null, 2)}</pre>`;
+                        responseHtml += '</div>';
+                        return responseHtml;
                     });
                 } else {
                     return response.text().then(text => {
-                        responseText += text;
-                        return responseText;
+                        const bodyType = contentType ? contentType.split(';')[0] : 'text/plain';
+                        responseHtml += `<h6><i class="fas fa-file-text me-2"></i>响应体 (${bodyType})</h6>`;
+                        responseHtml += `<pre>${text}</pre>`;
+                        responseHtml += '</div>';
+                        return responseHtml;
                     });
                 }
             })
-            .then(data => {
-                responseDiv.textContent = data;
+            .then(html => {
+                responseDiv.innerHTML = html;
             })
             .catch(error => {
-                responseDiv.textContent = '请求失败: ' + error.message;
+                responseDiv.innerHTML = `<div class="response-status error">
+                    请求失败: ${error.message}
+                </div>`;
             });
     }
 
@@ -1845,7 +1959,7 @@
         toggleBodyInput();
 
         // 清空响应
-        document.getElementById('testResponse').textContent = '点击测试按钮发送请求...';
+        document.getElementById('testResponse').innerHTML = '<div style="text-align: center; color: #6c757d; padding: 2rem;"><i class="fas fa-play-circle fa-2x mb-3"></i><br>点击测试按钮发送请求...</div>';
         
         // 恢复URL输入框到原始URL
         const testUrlInput = document.getElementById('testUrl');
