@@ -116,7 +116,7 @@ public class ProcessManagementService {
             // 获取实际的Java进程ID
             Long javaPid = -1L;
             int waitTimeOut = 0;
-            while(waitTimeOut < 10 && javaPid < 0){
+            while(waitTimeOut < 30 && javaPid < 0){
                 // 循环等待等待一段时间让Java进程启动
                 log.info("正在等待Mock Server启动: serviceId={}, port={}", serviceId, port);
                 Thread.sleep(1000);
