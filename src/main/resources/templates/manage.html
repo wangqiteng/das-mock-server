@@ -128,6 +128,11 @@
             width: 100%;
             justify-content: flex-start;
         }
+        .navbar-nav.ms-auto {
+            width: auto;
+            margin-left: auto !important;
+            justify-content: flex-end;
+        }
         
         /* 服务行悬停效果 */
         .service-row {
@@ -447,6 +452,13 @@
                     <li class="nav-item">
                         <a class="nav-link active" href="/manage">
                             <i class="fas fa-cogs me-1"></i>服务管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/system-logs" title="系统日志">
+                            <i class="fas fa-clipboard-list"></i>
                         </a>
                     </li>
                 </ul>

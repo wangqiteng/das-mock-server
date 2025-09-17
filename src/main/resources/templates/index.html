@@ -92,6 +92,12 @@
             width: 100%;
             justify-content: flex-start;
         }
+        /* 右侧图标分组需贴右边，覆盖上面的宽度设置 */
+        .navbar-nav.ms-auto {
+            width: auto;
+            margin-left: auto !important;
+            justify-content: flex-end;
+        }
         
         /* 按钮动画效果 */
         .btn {
@@ -261,6 +267,13 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/manage">
                             <i class="fas fa-cogs me-1"></i>服务管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/system-logs" title="系统日志">
+                            <i class="fas fa-clipboard-list"></i>
                         </a>
                     </li>
                 </ul>

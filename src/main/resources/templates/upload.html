@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -48,6 +48,11 @@
         .navbar-nav {
             width: 100%;
             justify-content: flex-start;
+        }
+        .navbar-nav.ms-auto {
+            width: auto;
+            margin-left: auto !important;
+            justify-content: flex-end;
         }
         
         /* 上传区域美化 */
@@ -327,6 +332,13 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/manage">
                             <i class="fas fa-cogs me-1"></i>服务管理
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/system-logs" title="系统日志">
+                            <i class="fas fa-clipboard-list"></i>
                         </a>
                     </li>
                 </ul>

@@ -2,7 +2,6 @@ package com.dbapp.dasmockserver.config;
 
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -10,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class AiConfig {
-    public static final String DEFAULT_PROMPT = "你是一个根据接口文档生成接口服务的助手，请根据用户提问生成相关代码！";
+    public static final String DEFAULT_PROMPT = "你是一个根据接口文档生成接口服务的助手，请根据用户提问生成相关接口信息！";
     
     @Value("${spring.ai.alibaba.dashscope.chat.options.model:qwen-turbo}")
     private String modelName;
