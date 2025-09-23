@@ -44,6 +44,9 @@ public class ApiEndpoint {
     @Column(columnDefinition = "TEXT")
     private String testRequestBody;
     
+    @Column(name = "smart_expectations", columnDefinition = "TEXT")
+    private String smartExpectations;
+
     @Column(columnDefinition = "TEXT")
     private String authConfig;
     
@@ -157,6 +160,14 @@ public class ApiEndpoint {
     
     public void setTestRequestBody(String testRequestBody) {
         this.testRequestBody = testRequestBody;
+    }
+
+    public String getSmartExpectations() {
+        return smartExpectations;
+    }
+
+    public void setSmartExpectations(String smartExpectations) {
+        this.smartExpectations = smartExpectations;
     }
     
     public String getAuthConfig() {

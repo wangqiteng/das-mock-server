@@ -123,7 +123,7 @@
                                     
                                     <div class="mb-3">
                                         <label for="endpointDescription" class="form-label fw-bold">端点描述</label>
-                                        <textarea class="form-control" id="endpointDescription" rows="3" 
+                                        <textarea class="form-control" id="endpointDescription" rows="1" 
                                                   th:text="${endpoint.description}"></textarea>
                                     </div>
                                 </div>
@@ -146,15 +146,69 @@
                                         <div class="form-text">设置为0表示无延迟</div>
                                     </div>
                                     
-                                    <div class="mb-3">
-                                        <label for="mockResponse" class="form-label fw-bold">Mock响应数据</label>
-                                        <textarea class="form-control json-editor" id="mockResponse" rows="10" 
-                                                  th:text="${endpoint.mockResponse}"></textarea>
-                                        <div class="form-text">请输入有效的JSON格式数据</div>
-                                    </div>
+                                    <!-- mock响应与智能期望已移动到页面底部的大区块 -->
                                 </div>
                             </div>
                             
+            <!-- 响应内容配置（底部Tab） -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>响应内容配置</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="nav nav-tabs" id="respTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="resp-default-tab" data-bs-toggle="tab" data-bs-target="#resp-default" type="button" role="tab">默认响应</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="resp-smart-tab" data-bs-toggle="tab" data-bs-target="#resp-smart" type="button" role="tab">智能期望</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content border border-top-0 p-3 rounded-bottom">
+                                <div class="tab-pane fade show active" id="resp-default" role="tabpanel" aria-labelledby="resp-default-tab">
+                                    <label for="mockResponse" class="form-label fw-bold">默认响应（JSON）</label>
+                                    <textarea class="form-control json-editor" id="mockResponse" rows="16" th:text="${endpoint.mockResponse}"></textarea>
+                                    <div class="form-text">请输入有效的JSON格式数据</div>
+                                </div>
+                                <div class="tab-pane fade" id="resp-smart" role="tabpanel" aria-labelledby="resp-smart-tab">
+                                    <div class="row g-3 align-items-start">
+                                        <div class="col-md-7">
+                                            <label class="form-label fw-bold">智能期望（JSON数组）</label>
+                                            <textarea class="form-control json-editor" id="smartExpectations" rows="16" th:text="${endpoint.smartExpectations}"></textarea>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label fw-bold">示例</label>
+                                            <div class="border rounded p-3 bg-light" style="height: 100%; overflow:auto;">
+<pre class="mb-0" style="white-space: pre; font-size: 0.85rem;">
+[
+  {
+    "match": {
+      "headers": {"X-Env": "test"},
+      "query": {"page": "1"},
+      "bodyContains": "keyword"
+    },
+    "response": {
+      "status": 200,
+      "headers": {"X-From": "smart"},
+      "delay": 0,
+      "body": {"message": "smart matched"}
+    }
+  }
+]
+</pre>
+                                                <div class="text-muted small">命中顺序按数组先后；未命中时返回“默认响应”。</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
                             <!-- 操作按钮 -->
                             <div class="d-flex gap-3 justify-content-center">
                                 <button type="submit" class="btn btn-primary btn-lg" id="saveBtn">
@@ -263,7 +317,8 @@
                 description: document.getElementById('endpointDescription').value,
                 statusCode: parseInt(document.getElementById('statusCode').value),
                 responseDelay: parseInt(document.getElementById('responseDelay').value) || 0,
-                mockResponse: mockResponse
+                mockResponse: mockResponse,
+                smartExpectations: (document.getElementById('smartExpectations')?.value || '')
             };
             
             const endpointId = document.getElementById('endpointId').value;
@@ -313,6 +368,22 @@
                 this.style.borderColor = '#ced4da';
             }
         });
+
+        // 智能期望JSON校验
+        const smartEl = document.getElementById('smartExpectations');
+        if (smartEl) {
+            smartEl.addEventListener('input', function() {
+                const v = this.value.trim();
+                if (!v) { this.style.borderColor = '#ced4da'; return; }
+                try {
+                    const parsed = JSON.parse(v);
+                    if (!Array.isArray(parsed)) throw new Error('需为JSON数组');
+                    this.style.borderColor = '#28a745';
+                } catch (e) {
+                    this.style.borderColor = '#dc3545';
+                }
+            });
+        }
     </script>
 </body>
 </html> 

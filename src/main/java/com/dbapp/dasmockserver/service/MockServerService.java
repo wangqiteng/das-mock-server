@@ -334,6 +334,9 @@ public class MockServerService {
             if (updatedEndpoint.getMockResponse() != null) {
                 existing.setMockResponse(updatedEndpoint.getMockResponse());
             }
+            if (updatedEndpoint.getSmartExpectations() != null) {
+                existing.setSmartExpectations(updatedEndpoint.getSmartExpectations());
+            }
             if (updatedEndpoint.getResponseDelay() != null) {
                 existing.setResponseDelay(updatedEndpoint.getResponseDelay());
             }

@@ -225,6 +225,25 @@ public class CodeGenerationService {
             );
         }
         
+        // 追加一个用于接收全部查询参数的Map
+        methodBuilder.addParameter(
+            ParameterSpec.builder(
+                ParameterizedTypeName.get(ClassName.get("java.util", "Map"), ClassName.get(String.class), ClassName.get(String.class)),
+                "allQueryParams")
+                .addAnnotation(AnnotationSpec.builder(
+                        ClassName.get("org.springframework.web.bind.annotation", "RequestParam"))
+                        .addMember("required", "$L", false)
+                        .build())
+                .build());
+
+        // 追加一个用于接收全部请求头的Map
+        methodBuilder.addParameter(
+            ParameterSpec.builder(
+                ParameterizedTypeName.get(ClassName.get("java.util", "Map"), ClassName.get(String.class), ClassName.get(String.class)),
+                "allHeaders")
+                .addAnnotation(ClassName.get("org.springframework.web.bind.annotation", "RequestHeader"))
+                .build());
+
         // 添加RequestBody参数到方法签名
         if (parameterInfo.getRequestBody() != null && !parameterInfo.getRequestBody().getProperties().isEmpty()) {
             String requestClassName = generateClassName(endpoint.getName() + "Request");
@@ -276,6 +295,58 @@ public class CodeGenerationService {
                 Thread.class, endpoint.getResponseDelay(), InterruptedException.class);
         }
         
+        // 智能期望优先匹配
+        if (endpoint.getSmartExpectations() != null && !endpoint.getSmartExpectations().trim().isEmpty()) {
+            CodeBlock smartBlock = CodeBlock.builder()
+                .add("try {\n")
+                .add("  String smartJson = $S;\n", endpoint.getSmartExpectations())
+                .add("  $T mapper = new $T();\n", ClassName.get("com.fasterxml.jackson.databind", "ObjectMapper"), ClassName.get("com.fasterxml.jackson.databind", "ObjectMapper"))
+                .add("  $T rules = mapper.readTree(smartJson);\n", ClassName.get("com.fasterxml.jackson.databind", "JsonNode"))
+                .add("  String bodyStr = null;\n")
+                .add("  try {\n")
+                .add("    bodyStr = mapper.writeValueAsString($L);\n", (parameterInfo.getRequestBody() != null && !parameterInfo.getRequestBody().getProperties().isEmpty()) ? ("array".equals(parameterInfo.getRequestBody().getType()) ? "requests" : "request") : "null")
+                .add("  } catch (Exception ignore) {}\n")
+                .add("  if (rules.isArray()) {\n")
+                .add("    for ($T rule : rules) {\n", ClassName.get("com.fasterxml.jackson.databind", "JsonNode"))
+                .add("      $T match = rule.path(\"match\");\n", ClassName.get("com.fasterxml.jackson.databind" , "JsonNode"))
+                .add("      boolean ok = true;\n")
+                .add("      // match headers\n")
+                .add("      if (match.has(\"headers\")) {\n")
+                .add("        for ($T it = match.get(\"headers\").fields(); it.hasNext();) {\n", ClassName.get("java.util", "Iterator"))
+                .add("          $T e = (Map.Entry)it.next();\n", ClassName.bestGuess("java.util.Map.Entry"))
+                .add("          String k = String.valueOf(e.getKey()).toLowerCase(); String v = String.valueOf(e.getValue()).replaceAll(\"^\\\"|\\\"$$\", \"\").toLowerCase();\n")
+                .add("          String hv = allHeaders.get(k);\n")
+                .add("          if (hv == null || !hv.equals(v)) { ok = false; break; }\n")
+                .add("        }\n")
+                .add("      }\n")
+                .add("      if (!ok) continue;\n")
+                .add("      // match query\n")
+                .add("      if (match.has(\"query\")) {\n")
+                .add("        for ($T it = match.get(\"query\").fields(); it.hasNext();) {\n", ClassName.get("java.util", "Iterator"))
+                .add("          $T e = (Map.Entry)it.next();\n", ClassName.bestGuess("java.util.Map.Entry"))
+                .add("          String k = String.valueOf(e.getKey()); String v = String.valueOf(e.getValue());\n")
+                .add("          String qv = allQueryParams.get(k);\n")
+                .add("          if (qv == null || !qv.equals(v)) { ok = false; break; }\n")
+                .add("        }\n")
+                .add("      }\n")
+                .add("      if (!ok) continue;\n")
+                .add("      // match bodyContains\n")
+                .add("      if (match.has(\"bodyContains\")) {\n")
+                .add("        String kw = match.get(\"bodyContains\").asText(\"\");\n")
+                .add("        if (kw != null && !kw.isEmpty()) { if (bodyStr == null || !bodyStr.contains(kw)) ok = false; }\n")
+                .add("      }\n")
+                .add("      if (!ok) continue;\n")
+                .add("      // response\n")
+                .add("      $T resp = rule.path(\"response\");\n", ClassName.get("com.fasterxml.jackson.databind", "JsonNode"))
+                .add("      if (resp.has(\"delay\")) { try { $T.sleep(resp.get(\"delay\").asInt(0)); } catch (Exception ignore) {} }\n", ClassName.get("java.lang", "Thread"))
+                .add("      if (resp.has(\"body\")) { return mapper.convertValue(resp.get(\"body\"), $T.class); }\n", ClassName.get("java.lang", "Object"))
+                .add("    }\n")
+                .add("  }\n")
+                .add("} catch (Exception ignore) {}\n")
+                .build();
+            methodBuilder.addCode(smartBlock);
+        }
+
         // 添加Mock响应
         if (endpoint.getMockResponse() != null && !endpoint.getMockResponse().isEmpty()) {
             CodeBlock tryBlock = CodeBlock.builder()
