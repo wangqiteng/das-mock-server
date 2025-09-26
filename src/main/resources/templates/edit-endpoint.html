@@ -168,15 +168,27 @@
                             </ul>
                             <div class="tab-content border border-top-0 p-3 rounded-bottom">
                                 <div class="tab-pane fade show active" id="resp-default" role="tabpanel" aria-labelledby="resp-default-tab">
-                                    <label for="mockResponse" class="form-label fw-bold">默认响应（JSON）</label>
-                                    <textarea class="form-control json-editor" id="mockResponse" rows="16" th:text="${endpoint.mockResponse}"></textarea>
-                                    <div class="form-text">请输入有效的JSON格式数据</div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label for="mockResponse" class="form-label fw-bold mb-0">默认响应（JSON）</label>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatJson('mockResponse')">
+                                            <i class="fas fa-code me-1"></i>格式化JSON
+                                        </button>
+                                    </div>
+                                    <textarea class="form-control json-editor" id="mockResponse" rows="16" th:text="${endpoint.mockResponse}" 
+                                              placeholder="请输入JSON格式的响应数据..."></textarea>
+                                    <div class="form-text">请输入有效的JSON格式数据，支持自动格式化</div>
                                 </div>
                                 <div class="tab-pane fade" id="resp-smart" role="tabpanel" aria-labelledby="resp-smart-tab">
                                     <div class="row g-3 align-items-start">
                                         <div class="col-md-7">
-                                            <label class="form-label fw-bold">智能期望（JSON数组）</label>
-                                            <textarea class="form-control json-editor" id="smartExpectations" rows="16" th:text="${endpoint.smartExpectations}"></textarea>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <label class="form-label fw-bold mb-0">智能期望（JSON数组）</label>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="formatJson('smartExpectations')">
+                                                    <i class="fas fa-code me-1"></i>格式化JSON
+                                                </button>
+                                            </div>
+                                            <textarea class="form-control json-editor" id="smartExpectations" rows="16" th:text="${endpoint.smartExpectations}"
+                                                      placeholder="请输入智能期望规则数组..."></textarea>
                                         </div>
                                         <div class="col-md-5">
                                             <label class="form-label fw-bold">示例</label>
@@ -383,6 +395,27 @@
                     this.style.borderColor = '#dc3545';
                 }
             });
+        }
+
+        // JSON格式化函数
+        function formatJson(textareaId) {
+            const textarea = document.getElementById(textareaId);
+            const value = textarea.value.trim();
+            if (!value) {
+                showToast('warning', '提示', '请输入JSON内容后再格式化');
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(value);
+                const formatted = JSON.stringify(parsed, null, 2);
+                textarea.value = formatted;
+                textarea.style.borderColor = '#28a745';
+                showToast('success', '格式化成功', 'JSON已格式化并缩进对齐');
+            } catch (error) {
+                textarea.style.borderColor = '#dc3545';
+                showToast('error', '格式化失败', 'JSON格式错误: ' + error.message);
+            }
         }
     </script>
 </body>
