@@ -361,8 +361,10 @@ public class ProcessManagementService {
             if (os.contains("win")) {
                 // Windows系统使用netstat -ano查找端口占用
                 command = new String[]{"cmd", "/c", "netstat", "-ano", "|", "findstr", ":" + port};
+            } else if (os.contains("mac")){
+                command = new String[]{"lsof", "-P", "-i", ":" + port};
             } else {
-                // Unix/Linux/Mac系统使用netstat -tulpn查找端口占用
+                // Unix/Linux系统使用netstat -tulpn查找端口占用
                 command = new String[]{"netstat", "-tulpn", "|", "grep", ":" + port};
             }
             
@@ -375,7 +377,7 @@ public class ProcessManagementService {
             
             String line;
             while ((line = reader.readLine()) != null) {
-                log.debug("netstat输出: {}", line);
+                log.debug("netstat/lsof输出: {}", line);
                 
                 if (os.contains("win")) {
                     // Windows格式: TCP 0.0.0.0:8080 0.0.0.0:0 LISTENING 1234
@@ -388,6 +390,20 @@ public class ProcessManagementService {
                                 return pid;
                             } catch (NumberFormatException e) {
                                 log.warn("无法解析Windows netstat进程ID: {}", parts[parts.length - 1]);
+                            }
+                        }
+                    }
+                } else if (os.contains("mac")){
+                    if (line.contains(":" + port) && line.contains("LISTEN")) {
+                        String[] parts = line.trim().split("\\s+");
+                        if (parts.length >= 7) {
+                            String pidStr = parts[1];
+                            try {
+                                Long pid = Long.parseLong(pidStr);
+                                log.info("通过lsof找到Mac进程ID: {} (端口: {})", pid, port);
+                                return pid;
+                            } catch (NumberFormatException e) {
+                                log.warn("无法解析lsof进程ID: {}", pidStr);
                             }
                         }
                     }
