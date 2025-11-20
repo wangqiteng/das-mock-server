@@ -78,6 +78,9 @@ public class MockServerService {
         
         // 解析文档内容
         String documentContent = documentParserService.parseDocument(file);
+        if(documentContent.length() > aiMaxTokens / 3 * 2){
+            throw new IllegalArgumentException("文档内容太多啦，请精简需要生成的接口或者适当调整token数量！");
+        }
         
         // 创建Mock服务
         MockService mockService = createMockService(serviceName, description, tags, port);
