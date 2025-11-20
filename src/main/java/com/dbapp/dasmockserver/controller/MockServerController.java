@@ -33,7 +33,7 @@ public class MockServerController {
      * 上传文档并生成Mock服务
      */
     @PostMapping("/generate")
-    public ResponseEntity<MockService> generateMockService(
+    public ResponseEntity<?> generateMockService(
             @RequestParam("file") MultipartFile file,
             @RequestParam("serviceName") String serviceName,
             @RequestParam(value = "description", required = false) String description,
@@ -49,9 +49,21 @@ public class MockServerController {
                 file, serviceName, description, tags, port, aiModel, aiTemperature, aiMaxTokens, aiTopP);
             return ResponseEntity.ok(mockService);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            log.error("生成Mock服务参数错误: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage() != null ? e.getMessage() : "请求参数错误"
+            ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("生成Mock服务失败: {}", e.getMessage(), e);
+            String errorMessage = e.getMessage();
+            if (errorMessage == null || errorMessage.isEmpty()) {
+                errorMessage = "生成Mock服务时发生未知错误";
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "error", errorMessage
+            ));
         }
     }
     
@@ -298,7 +310,6 @@ public class MockServerController {
             if (serviceOpt.isEmpty()) {
                 return ResponseEntity.notFound().build();
             }
-            MockService service = serviceOpt.get();
             
             boolean isRunning = mockServerService.isServiceRunning(id);
             Long processId = mockServerService.getServiceProcessId(id);

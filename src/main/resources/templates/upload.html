@@ -824,13 +824,29 @@
                         window.location.href = `/service/${result.id}`;
                     }, 1000);
                 } else {
-                    throw new Error('生成失败');
+                    // 尝试解析错误响应
+                    let errorMessage = '生成失败';
+                    try {
+                        const errorResult = await response.json();
+                        if (errorResult.error) {
+                            errorMessage = errorResult.error;
+                        } else if (errorResult.message) {
+                            errorMessage = errorResult.message;
+                        } else {
+                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        }
+                    } catch (parseError) {
+                        // 如果无法解析JSON，使用状态文本
+                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    }
+                    throw new Error(errorMessage);
                 }
             } catch (error) {
                 clearInterval(progressInterval);
                 progressContainer.style.display = 'none';
                 submitBtn.disabled = false;
-                showToast('error', '生成失败', '生成Mock Server失败：' + error.message);
+                const errorMsg = error.message || '生成Mock Server失败，请检查网络连接或稍后重试';
+                showToast('error', '生成失败', errorMsg);
             }
         });
 

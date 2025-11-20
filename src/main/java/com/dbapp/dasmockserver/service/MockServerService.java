@@ -73,12 +73,14 @@ public class MockServerService {
                                                       Integer aiMaxTokens, Double aiTopP) throws IOException {
         // 验证文件格式
         if (!documentParserService.isSupportedFormat(file.getOriginalFilename())) {
+            log.error("不支持的文件格式");
             throw new IllegalArgumentException("不支持的文件格式");
         }
         
         // 解析文档内容
         String documentContent = documentParserService.parseDocument(file);
-        if(documentContent.length() > aiMaxTokens / 3 * 2){
+        if(documentContent.length() > aiMaxTokens + 1000){
+            log.error("文档内容太多啦，请精简需要生成的接口或者适当调整token数量！");
             throw new IllegalArgumentException("文档内容太多啦，请精简需要生成的接口或者适当调整token数量！");
         }
         

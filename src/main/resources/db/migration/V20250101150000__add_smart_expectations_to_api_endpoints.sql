@@ -2,3 +2,4 @@
 ALTER TABLE api_endpoints ADD COLUMN IF NOT EXISTS smart_expectations TEXT;
 
 
+
