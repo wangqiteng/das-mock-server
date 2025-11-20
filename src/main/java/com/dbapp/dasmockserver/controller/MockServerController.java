@@ -48,6 +48,14 @@ public class MockServerController {
             MockService mockService = mockServerService.generateMockServiceFromDocument(
                 file, serviceName, description, tags, port, aiModel, aiTemperature, aiMaxTokens, aiTopP);
             return ResponseEntity.ok(mockService);
+        } catch (IllegalStateException e) {
+            // 处理并发锁冲突的情况
+            log.warn("文档生成服务繁忙: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                    "success", false,
+                    "error", e.getMessage() != null ? e.getMessage() : "系统正在处理其他文档生成请求，请稍后再试",
+                    "code", "SERVICE_BUSY"
+            ));
         } catch (IllegalArgumentException e) {
             log.error("生成Mock服务参数错误: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of(

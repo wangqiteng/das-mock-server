@@ -18,6 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.dbapp.dasmockserver.service.AiCodeGenerationService.temporaryConfig;
 
@@ -50,6 +52,12 @@ public class MockServerService {
     @Value("${app.file.upload.path:./uploads/}")
     private String uploadRootPath;
     
+    // 文档生成服务的锁，避免并发上传导致报错
+    private final ReentrantLock documentGenerationLock = new ReentrantLock();
+    
+    // 锁等待超时时间（秒）
+    private static final long LOCK_TIMEOUT_SECONDS = 30;
+    
     /**
      * 创建新的Mock服务
      */
@@ -66,99 +74,123 @@ public class MockServerService {
     
     /**
      * 上传文档并生成Mock服务
+     * 使用锁机制避免并发上传导致报错
      */
     public MockService generateMockServiceFromDocument(MultipartFile file, String serviceName, 
                                                       String description, String tags, Integer port,
                                                       String aiModel, Double aiTemperature, 
                                                       Integer aiMaxTokens, Double aiTopP) throws IOException {
-        // 验证文件格式
-        if (!documentParserService.isSupportedFormat(file.getOriginalFilename())) {
-            log.error("不支持的文件格式");
-            throw new IllegalArgumentException("不支持的文件格式");
-        }
-        
-        // 解析文档内容
-        String documentContent = documentParserService.parseDocument(file);
-        if(documentContent.length() > aiMaxTokens + 1000){
-            log.error("文档内容太多啦，请精简需要生成的接口或者适当调整token数量！");
-            throw new IllegalArgumentException("文档内容太多啦，请精简需要生成的接口或者适当调整token数量！");
-        }
-        
-        // 创建Mock服务
-        MockService mockService = createMockService(serviceName, description, tags, port);
-        mockService.setOriginalDocument(documentContent);
-        mockService.setDocumentType(getFileExtension(file.getOriginalFilename()));
-        mockService.setStatus(MockService.ServiceStatus.GENERATING);
-        mockService = mockServiceRepository.save(mockService);
+        // 尝试获取锁，如果锁被占用则抛出异常
+        boolean lockAcquired = false;
+        try {
+            lockAcquired = documentGenerationLock.tryLock(LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!lockAcquired) {
+                log.warn("文档生成服务正在处理其他请求，请稍后再试");
+                throw new IllegalStateException("系统正在处理其他文档生成请求，请稍后再试");
+            }
+            
+            log.info("获取文档生成锁成功，开始处理文档上传: {}", serviceName);
+            
+            // 验证文件格式
+            if (!documentParserService.isSupportedFormat(file.getOriginalFilename())) {
+                log.error("不支持的文件格式");
+                throw new IllegalArgumentException("不支持的文件格式");
+            }
+            
+            // 解析文档内容
+            String documentContent = documentParserService.parseDocument(file);
+            if(documentContent.length() > aiMaxTokens + 1000){
+                log.error("文档内容太多啦，请精简需要生成的接口或者适当调整token数量！");
+                throw new IllegalArgumentException("文档内容太多啦，请精简需要生成的接口或者适当调整token数量！");
+            }
+            
+            // 创建Mock服务
+            MockService mockService = createMockService(serviceName, description, tags, port);
+            mockService.setOriginalDocument(documentContent);
+            mockService.setDocumentType(getFileExtension(file.getOriginalFilename()));
+            mockService.setStatus(MockService.ServiceStatus.GENERATING);
+            mockService = mockServiceRepository.save(mockService);
 
-        // 保存原始上传文件到磁盘: uploads/service-{id}/<originalFilename>
-        try {
-            java.nio.file.Path serviceDir = java.nio.file.Paths.get(uploadRootPath, "service-" + mockService.getId());
-            java.nio.file.Files.createDirectories(serviceDir);
-            String originalFilename = Optional.ofNullable(file.getOriginalFilename()).orElse("uploaded." + mockService.getDocumentType());
-            java.nio.file.Path target = serviceDir.resolve(originalFilename);
-            try (java.io.InputStream in = file.getInputStream()) {
-                java.nio.file.Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (Exception e) {
-            log.warn("保存原始上传文件失败，将继续生成: {}", e.getMessage());
-        }
-        
-        try {
-            // 临时设置AI配置用于本次生成
-            aiCodeGenerationService.setTemporaryAiConfig(aiModel, aiTemperature, aiMaxTokens, aiTopP);
-            
-            // 使用AI分析文档并生成API端点
-            List<ApiEndpoint> endpoints = aiCodeGenerationService.generateApiEndpoints(documentContent, mockService);
-            
-            // 保存API端点
-            for (ApiEndpoint endpoint : endpoints) {
-                endpoint.setMockService(mockService);
-                apiEndpointRepository.save(endpoint);
-            }
-            
-            // 生成Mock响应和测试请求体
-            for (ApiEndpoint endpoint : endpoints) {
-                String mockResponse = aiCodeGenerationService.generateMockResponse(endpoint);
-                endpoint.setMockResponse(mockResponse);
-                
-                // 为需要请求体的端点生成测试请求体
-                if (endpoint.getMethod() == ApiEndpoint.HttpMethod.POST || 
-                    endpoint.getMethod() == ApiEndpoint.HttpMethod.PUT || 
-                    endpoint.getMethod() == ApiEndpoint.HttpMethod.PATCH) {
-                    String testRequestBody = aiCodeGenerationService.generateTestRequestBody(endpoint);
-                    endpoint.setTestRequestBody(testRequestBody);
+            // 保存原始上传文件到磁盘: uploads/service-{id}/<originalFilename>
+            try {
+                java.nio.file.Path serviceDir = java.nio.file.Paths.get(uploadRootPath, "service-" + mockService.getId());
+                java.nio.file.Files.createDirectories(serviceDir);
+                String originalFilename = Optional.ofNullable(file.getOriginalFilename()).orElse("uploaded." + mockService.getDocumentType());
+                java.nio.file.Path target = serviceDir.resolve(originalFilename);
+                try (java.io.InputStream in = file.getInputStream()) {
+                    java.nio.file.Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }
-
-                // 当端点包含认证信息时，自动生成用于测试的请求头
-                Map<String, String> testHeaders = buildTestAuthHeaders(endpoint);
-                if (testHeaders != null && !testHeaders.isEmpty()) {
-                    endpoint.setHeaders(testHeaders);
+            } catch (Exception e) {
+                log.warn("保存原始上传文件失败，将继续生成: {}", e.getMessage());
+            }
+            
+            try {
+                // 临时设置AI配置用于本次生成
+                aiCodeGenerationService.setTemporaryAiConfig(aiModel, aiTemperature, aiMaxTokens, aiTopP);
+                
+                // 使用AI分析文档并生成API端点
+                List<ApiEndpoint> endpoints = aiCodeGenerationService.generateApiEndpoints(documentContent, mockService);
+                
+                // 保存API端点
+                for (ApiEndpoint endpoint : endpoints) {
+                    endpoint.setMockService(mockService);
+                    apiEndpointRepository.save(endpoint);
                 }
                 
-                apiEndpointRepository.save(endpoint);
-            }
-            
-            // 生成代码项目
-            String projectPath = codeGenerationService.generateMockServerProject(mockService, endpoints);
-            mockService.setProjectPath(projectPath);
-            mockService.setBaseUrl(networkUtil.buildServiceUrl(port));
-            log.info("Mock服务生成成功，项目路径: {},访问路径: {}", projectPath,mockService.getBaseUrl());
-            mockService.setStatus(MockService.ServiceStatus.CREATED);
-            mockServiceRepository.save(mockService);
+                // 生成Mock响应和测试请求体
+                for (ApiEndpoint endpoint : endpoints) {
+                    String mockResponse = aiCodeGenerationService.generateMockResponse(endpoint);
+                    endpoint.setMockResponse(mockResponse);
+                    
+                    // 为需要请求体的端点生成测试请求体
+                    if (endpoint.getMethod() == ApiEndpoint.HttpMethod.POST || 
+                        endpoint.getMethod() == ApiEndpoint.HttpMethod.PUT || 
+                        endpoint.getMethod() == ApiEndpoint.HttpMethod.PATCH) {
+                        String testRequestBody = aiCodeGenerationService.generateTestRequestBody(endpoint);
+                        endpoint.setTestRequestBody(testRequestBody);
+                    }
 
-            // 清除临时AI配置
-            if (temporaryConfig.get() != null) {
-                temporaryConfig.remove();
-            }
+                    // 当端点包含认证信息时，自动生成用于测试的请求头
+                    Map<String, String> testHeaders = buildTestAuthHeaders(endpoint);
+                    if (testHeaders != null && !testHeaders.isEmpty()) {
+                        endpoint.setHeaders(testHeaders);
+                    }
+                    
+                    apiEndpointRepository.save(endpoint);
+                }
+                
+                // 生成代码项目
+                String projectPath = codeGenerationService.generateMockServerProject(mockService, endpoints);
+                mockService.setProjectPath(projectPath);
+                mockService.setBaseUrl(networkUtil.buildServiceUrl(port));
+                log.info("Mock服务生成成功，项目路径: {},访问路径: {}", projectPath,mockService.getBaseUrl());
+                mockService.setStatus(MockService.ServiceStatus.CREATED);
+                mockServiceRepository.save(mockService);
 
-            return mockService;
-            
-        } catch (Exception e) {
-            mockService.setStatus(MockService.ServiceStatus.ERROR);
-            mockServiceRepository.save(mockService);
-            log.error("生成Mock服务失败: {}", e.getMessage(),e);
-            throw new RuntimeException("生成Mock服务失败: " + e.getMessage(), e);
+                // 清除临时AI配置
+                if (temporaryConfig.get() != null) {
+                    temporaryConfig.remove();
+                }
+
+                log.info("文档生成处理完成，释放锁: {}", serviceName);
+                return mockService;
+                
+            } catch (Exception e) {
+                mockService.setStatus(MockService.ServiceStatus.ERROR);
+                mockServiceRepository.save(mockService);
+                log.error("生成Mock服务失败: {}", e.getMessage(),e);
+                throw new RuntimeException("生成Mock服务失败: " + e.getMessage(), e);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("获取文档生成锁时被中断: {}", e.getMessage());
+            throw new IllegalStateException("文档生成请求被中断，请重试");
+        } finally {
+            // 确保释放锁
+            if (lockAcquired && documentGenerationLock.isHeldByCurrentThread()) {
+                documentGenerationLock.unlock();
+                log.debug("文档生成锁已释放");
+            }
         }
     }
     
