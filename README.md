@@ -225,6 +225,108 @@ das-mock-server/
 
 ## 部署说明
 
+### 一键部署到服务器
+
+项目已配置 Maven 插件，支持一键打包并部署到远程服务器。
+
+#### 前置条件
+
+1. **服务器准备**
+   - 确保服务器已安装 Java 17+
+   - 确保服务器 `/opt/app` 目录存在且有写权限
+   - 确保服务器上已有 `start.sh` 脚本（用于启动/停止服务）
+
+2. **配置服务器信息**
+
+   方式一：通过命令行参数传递（推荐用于临时部署）
+   ```bash
+   mvn clean package -DskipTests -Pdeploy \
+     -Dserver.username=root \
+     -Dserver.password=你的密码
+   ```
+
+   方式二：在 Maven `settings.xml` 中配置（推荐用于生产环境）
+   
+   编辑 `~/.m2/settings.xml` 文件，添加以下配置：
+   ```xml
+   <settings>
+     <profiles>
+       <profile>
+         <id>deploy-server</id>
+         <properties>
+           <server.username>root</server.username>
+           <server.password>你的密码</server.password>
+         </properties>
+       </profile>
+     </profiles>
+     <activeProfiles>
+       <activeProfile>deploy-server</activeProfile>
+     </activeProfiles>
+   </settings>
+   ```
+   
+   配置后，只需执行：
+   ```bash
+   mvn clean package -DskipTests -Pdeploy
+   ```
+
+#### 部署步骤
+
+1. **执行一键部署命令**
+   ```bash
+   # 使用命令行参数
+   mvn clean package -DskipTests -Pdeploy \
+     -Dserver.username=root \
+     -Dserver.password=你的密码
+   ```
+
+2. **部署过程**
+   - 自动执行 `mvn clean package -DskipTests` 打包项目
+   - 自动上传 `target/das-mock-server-1.0.0.jar` 到服务器 `10.50.2.217:/opt/app/`
+   - 自动执行服务器上的 `sh start.sh restart` 脚本重启服务
+
+3. **验证部署**
+   ```bash
+   # SSH 连接到服务器查看服务状态
+   ssh root@10.50.2.217
+   cd /opt/app
+   sh start.sh status
+   ```
+
+#### 配置说明
+
+- **服务器地址**: 10.50.2.217（可在 `pom.xml` 中修改）
+- **部署目录**: `/opt/app`（可在 `pom.xml` 中修改）
+- **JAR 文件名**: `das-mock-server-1.0.0.jar`
+- **启动脚本**: `/opt/app/start.sh restart`
+
+#### 服务器 start.sh 脚本
+
+部署脚本会自动执行服务器上的 `start.sh restart` 命令。确保服务器 `/opt/app` 目录下存在 `start.sh` 脚本。
+
+`start.sh` 脚本应支持以下命令：
+- `start`: 启动服务
+- `stop`: 停止服务
+- `restart`: 重启服务
+- `status`: 查看服务状态
+
+项目已包含 `start.sh` 脚本模板（位于 `src/main/resources/start.sh`），可复制到服务器使用：
+```bash
+# 将脚本复制到服务器
+scp src/main/resources/start.sh root@10.50.2.217:/opt/app/
+# 赋予执行权限
+ssh root@10.50.2.217 "chmod +x /opt/app/start.sh"
+```
+
+#### 仅打包不部署
+
+如果只需要打包，不部署到服务器：
+```bash
+mvn clean package -DskipTests
+```
+
+打包后的 JAR 文件位于 `target/das-mock-server-1.0.0.jar`
+
 ### Docker部署
 
 1. **构建镜像**
