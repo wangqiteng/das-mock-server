@@ -163,19 +163,19 @@
 										
 										<echo message="========================================="/>
 										<echo message="开始一键部署到服务器..."/>
-										<echo message="服务器: 10.50.2.217"/>
-										<echo message="目标目录: /opt/app"/>
+										<echo message="服务器: ${server.host}"/>
+										<echo message="目标目录: ${server.dir}"/>
 										<echo message="========================================="/>
 										<echo message="正在上传文件: target/das-mock-server-1.0.0.jar"/>
 										<scp
 												file="target/das-mock-server-1.0.0.jar"
-												todir="${server.username}:${server.password}@10.50.2.217:/opt/app/"
+												todir="${server.username}:${server.password}@${server.host}:${server.dir}"
 												trust="true"
 												failonerror="true"/>
 										<echo message="✓ 文件上传成功"/>
 										<echo message="正在执行服务器重启脚本..."/>
 										<sshexec
-												host="10.50.2.217"
+												host="${server.host}"
 												username="${server.username}"
 												password="${server.password}"
 												command="source /etc/profile &amp;&amp; source ~/.bashrc &amp;&amp; cd /opt/app &amp;&amp; sh start.sh restart"
