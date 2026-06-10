@@ -2,6 +2,7 @@ package com.dbapp.dasmockserver.controller;
 
 import com.dbapp.dasmockserver.config.AiConfig;
 import com.dbapp.dasmockserver.model.ApiEndpoint;
+import com.dbapp.dasmockserver.model.CustomModelConfig;
 import com.dbapp.dasmockserver.model.MockService;
 import com.dbapp.dasmockserver.service.AiConfigService;
 import com.dbapp.dasmockserver.service.MockServerService;
@@ -302,6 +303,100 @@ public class WebController {
             return ResponseEntity.ok(defaultConfig);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    // ==================== 自定义模型管理 API ====================
+    
+    /**
+     * 获取所有自定义模型列表
+     */
+    @GetMapping("/api/custom-models")
+    @ResponseBody
+    public ResponseEntity<List<CustomModelConfig>> getCustomModels() {
+        try {
+            List<CustomModelConfig> models = aiConfigService.getAllCustomModels();
+            return ResponseEntity.ok(models);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * 新增自定义模型
+     */
+    @PostMapping("/api/custom-models")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> addCustomModel(@RequestBody CustomModelConfig modelConfig) {
+        try {
+            CustomModelConfig saved = aiConfigService.addCustomModel(modelConfig);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "模型添加成功",
+                "model", saved
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "添加模型失败: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * 更新自定义模型
+     */
+    @PutMapping("/api/custom-models/{id}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> updateCustomModel(
+            @PathVariable Long id, @RequestBody CustomModelConfig modelConfig) {
+        try {
+            CustomModelConfig updated = aiConfigService.updateCustomModel(id, modelConfig);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "模型更新成功",
+                "model", updated
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "更新模型失败: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * 删除自定义模型
+     */
+    @DeleteMapping("/api/custom-models/{id}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> deleteCustomModel(@PathVariable Long id) {
+        try {
+            aiConfigService.deleteCustomModel(id);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "模型删除成功"
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "删除模型失败: " + e.getMessage()
+            ));
         }
     }
 } 

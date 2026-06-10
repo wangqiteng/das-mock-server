@@ -79,21 +79,31 @@ public class AiCodeGenerationService {
      */
     public List<ApiEndpoint> generateApiEndpoints(String documentContent, MockService mockService) {
         AiConfig.AiModelConfig config = temporaryConfig.get();
+        String modelName = config != null ? config.getModelName() : null;
+
         // 如果有恒脑配置，则使用恒脑配置
-        if (("hengNao".equals(config.getModelName())) && hengNaoSwitch) {
+        if (("hengNao".equals(modelName)) && hengNaoSwitch) {
             String prompt = buildApiAnalysisPrompt(documentContent);
             String aiResponse = callHengNaoAi(prompt);
             return parseApiEndpointsFromHengNaoAiResponse(aiResponse, mockService);
         }
 
         // 如果没有AI相关配置，返回空
-        if (chatClient == null) {
+        if (chatClient == null && modelName == null) {
             return List.of();
+        }
+        
+        // 如果没有 chatClient 但有自定义 URL 模型，也可以继续
+        if (chatClient == null) {
+            var customModelOpt = aiConfigService.getCustomModelByModelId(modelName);
+            if (customModelOpt.isEmpty() || customModelOpt.get().getApiUrl() == null || customModelOpt.get().getApiUrl().trim().isEmpty()) {
+                return List.of();
+            }
         }
         
         String prompt = buildApiAnalysisPrompt(documentContent);
         
-        // 使用动态配置调用AI
+        // 使用动态配置调用AI（内部会自动路由到 DashScope/自定义URL）
         String aiResponse = callAiWithDynamicConfig(prompt);
         
         return parseApiEndpointsFromAiResponse(aiResponse, mockService);
@@ -1780,7 +1790,16 @@ public class AiCodeGenerationService {
                 config.getModelName(), config.getTemperature(), config.getMaxTokens(), 
                 config.getTopP(), configSource);
             
-            // 调用AI并返回结果
+            // 检查是否为自定义URL模型
+            var customModelOpt = aiConfigService.getCustomModelByModelId(config.getModelName());
+            if (customModelOpt.isPresent()) {
+                var customModel = customModelOpt.get();
+                if (customModel.getApiUrl() != null && !customModel.getApiUrl().trim().isEmpty()) {
+                    return callCustomUrlAi(prompt, config, customModel);
+                }
+            }
+            
+            // 默认走 DashScope 调用
             DashScopeChatOptions customOptions = DashScopeChatOptions.builder()
                     .withTopP(config.getTopP())
                     .withTemperature(config.getTemperature())
@@ -1794,6 +1813,72 @@ public class AiCodeGenerationService {
         } catch (Exception e) {
             log.error("AI调用失败: {}", e.getMessage(), e);
             throw new RuntimeException("AI调用失败: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * 调用自定义URL的AI服务（兼容 OpenAI API 格式）
+     */
+    private String callCustomUrlAi(String prompt, AiConfig.AiModelConfig config, com.dbapp.dasmockserver.model.CustomModelConfig customModel) {
+        try {
+            String apiUrl = customModel.getApiUrl().trim();
+            String apiKey = customModel.getApiKey();
+            String modelId = customModel.getModelId();
+            
+            // 构建 OpenAI 兼容的请求体
+            Map<String, Object> requestBody = new java.util.LinkedHashMap<>();
+            requestBody.put("model", modelId);
+            requestBody.put("temperature", config.getTemperature());
+            requestBody.put("max_tokens", config.getMaxTokens());
+            requestBody.put("top_p", config.getTopP());
+            requestBody.put("messages", List.of(
+                Map.of("role", "system", "content", DEFAULT_PROMPT),
+                Map.of("role", "user", "content", prompt)
+            ));
+            
+            String jsonBody = objectMapper.writeValueAsString(requestBody);
+            
+            log.info("调用自定义AI服务: url={}, model={}", apiUrl, modelId);
+            
+            // 构建 HTTP 请求
+            HttpClient client = HttpClient.newHttpClient();
+            java.net.http.HttpRequest.Builder requestBuilder = java.net.http.HttpRequest.newBuilder()
+                    .uri(URI.create(apiUrl))
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonBody));
+            
+            // 如果有 API Key，添加 Authorization 头
+            if (apiKey != null && !apiKey.trim().isEmpty()) {
+                requestBuilder.header("Authorization", "Bearer " + apiKey.trim());
+            }
+            
+            java.net.http.HttpRequest request = requestBuilder.build();
+            java.net.http.HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() == 200) {
+                // 解析 OpenAI 兼容的响应格式
+                JsonNode responseJson = objectMapper.readTree(response.body());
+                JsonNode choices = responseJson.get("choices");
+                if (choices != null && choices.isArray() && choices.size() > 0) {
+                    JsonNode message = choices.get(0).get("message");
+                    if (message != null && message.has("content")) {
+                        String content = message.get("content").asText();
+                        log.info("自定义AI服务响应成功，内容长度: {}", content.length());
+                        return content;
+                    }
+                }
+                // 如果不是标准 OpenAI 格式，尝试直接返回
+                log.warn("自定义AI响应格式非标准OpenAI格式，尝试直接返回");
+                return response.body();
+            } else {
+                log.error("自定义AI服务调用失败，状态码: {}，响应: {}", response.statusCode(), response.body());
+                throw new RuntimeException("自定义AI服务返回错误: HTTP " + response.statusCode());
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("自定义AI服务调用失败: {}", e.getMessage(), e);
+            throw new RuntimeException("自定义AI服务调用失败: " + e.getMessage(), e);
         }
     }
 

@@ -305,6 +305,152 @@
                 transform: none;
             }
         }
+
+        /* ==================== 模型管理模态框样式 ==================== */
+        #modelManageModal .modal-content {
+            border: none;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        #modelManageModal .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 1.25rem;
+        }
+        #modelManageModal .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+        #modelManageModal .modal-body {
+            padding: 1.25rem;
+        }
+        #modelManageModal .modal-footer {
+            border-top: 1px solid #f0f0f0;
+            padding: 0.75rem 1.25rem;
+        }
+
+        /* 表单面板 */
+        .model-form-panel {
+            border: 1px solid #e8ecf4;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 1.25rem;
+        }
+        .model-form-panel .panel-header {
+            background: linear-gradient(135deg, rgba(102,126,234,0.08) 0%, rgba(118,75,162,0.08) 100%);
+            padding: 0.6rem 1rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #444;
+            border-bottom: 1px solid #e8ecf4;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .model-form-panel .panel-body {
+            padding: 1rem;
+            background: #fafbfd;
+        }
+        .model-form-panel .form-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.25rem;
+        }
+        .model-form-panel .form-control,
+        .model-form-panel .form-select {
+            border-radius: 8px;
+            font-size: 0.85rem;
+            border: 1.5px solid #dde1ea;
+            padding: 0.4rem 0.65rem;
+            transition: border-color 0.2s;
+        }
+        .model-form-panel .form-control:focus,
+        .model-form-panel .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+        .model-form-panel .form-text {
+            font-size: 0.72rem;
+            color: #999;
+        }
+        .model-form-panel .btn {
+            border-radius: 8px;
+            font-size: 0.82rem;
+            padding: 0.35rem 1rem;
+        }
+
+        /* 模型卡片列表 */
+        .model-card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .model-card-item {
+            display: flex;
+            align-items: center;
+            padding: 0.65rem 1rem;
+            border: 1px solid #e8ecf4;
+            border-radius: 10px;
+            background: #fff;
+            transition: all 0.2s;
+            gap: 1rem;
+        }
+        .model-card-item:hover {
+            border-color: #c5cde8;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.1);
+        }
+        .model-card-item .model-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #333;
+            min-width: 100px;
+        }
+        .model-card-item .model-id {
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.78rem;
+            color: #667eea;
+            background: rgba(102,126,234,0.07);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            min-width: 90px;
+        }
+        .model-card-item .model-url {
+            font-size: 0.75rem;
+            color: #888;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .model-card-item .model-type-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .model-card-item .model-actions {
+            display: flex;
+            gap: 0.35rem;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .model-card-item .model-actions .btn {
+            border-radius: 6px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.78rem;
+        }
+        .model-empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: #aaa;
+        }
+        .model-empty-state i {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -415,23 +561,28 @@
                             <label class="form-label mb-0">
                                 <i class="fas fa-robot me-2"></i>AI模型配置
                             </label>
-                            <button type="button" class="btn btn-sm btn-outline-info" id="aiConfigToggle">
-                                <i class="fas fa-cog me-1"></i>高级配置
-                            </button>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="manageModelsBtn">
+                                    <i class="fas fa-list me-1"></i>管理模型
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info" id="aiConfigToggle">
+                                    <i class="fas fa-cog me-1"></i>高级配置
+                                </button>
+                            </div>
                         </div>
                         
                         <!-- 基础配置 -->
                         <div class="row" id="basicAiConfig">
                             <div class="col-md-6 mb-2">
-                                <label for="aiModel" class="form-label">AI模型</label>
-                                <select class="form-select" id="aiModel" name="aiModel">
-                                    <option value="qwen-turbo">通义千问Turbo</option>
-                                    <option value="qwen-plus">通义千问Plus</option>
-                                    <option value="qwen-max">通义千问Max</option>
-                                    <option value="qwen-max-longcontext">通义千问Max长文本</option>
-                                    <option value="hengNao">恒脑</option>
+                                <label for="aiModel" class="form-label">AI模型 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="aiModel" name="aiModel" required>
+                                    <option value="" disabled selected>请选择AI模型</option>
+                                    <!-- 动态加载模型列表 -->
                                 </select>
-                                <div class="form-text">选择用于生成代码的AI模型</div>
+                                <div id="aiModelError" class="invalid-feedback" style="display:none;">
+                                    <i class="fas fa-exclamation-circle me-1"></i>请选择一个AI模型
+                                </div>
+                                <div class="form-text">选择用于生成代码的AI模型，可点击"管理模型"自定义</div>
                             </div>
                             <div class="col-md-6 mb-2">
                                 <label for="aiTemperature" class="form-label">创造性 (Temperature)</label>
@@ -534,6 +685,95 @@
                             <p class="format-description">支持.txt格式的纯文本</p>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模型管理模态框 -->
+    <div class="modal fade" id="modelManageModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>模型管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- 新增/编辑模型表单 -->
+                    <div class="model-form-panel">
+                        <div class="panel-header">
+                            <i class="fas fa-plus-circle" style="color:#667eea;" id="modelFormIcon"></i>
+                            <span id="modelFormTitle">新增模型</span>
+                        </div>
+                        <div class="panel-body">
+                            <input type="hidden" id="editModelId" value="">
+                            <!-- 基本信息行 -->
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-4">
+                                    <label class="form-label">模型ID <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-sm" id="modelIdInput" placeholder="如 deepseek-chat">
+                                    <div class="form-text">参考厂商文档获取标识符</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">显示名称 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-sm" id="modelDisplayNameInput" placeholder="如 DeepSeek">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">描述</label>
+                                    <input type="text" class="form-control form-control-sm" id="modelDescriptionInput" placeholder="简要描述">
+                                </div>
+                            </div>
+                            <!-- API配置行 -->
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-5">
+                                    <label class="form-label">Base URL</label>
+                                    <input type="text" class="form-control form-control-sm" id="modelApiUrlInput" placeholder="如 https://api.deepseek.com/v1/chat/completions">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">API Key</label>
+                                    <input type="password" class="form-control form-control-sm" id="modelApiKeyInput" placeholder="sk-xxxxxxxx">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">接口类型</label>
+                                    <select class="form-select form-select-sm" id="modelApiTypeInput">
+                                        <option value="openai_compatible">OpenAI兼容</option>
+                                        <option value="dashscope">DashScope</option>
+                                        <option value="hengnao">恒脑</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-text mb-2">
+                                <i class="fas fa-info-circle me-1" style="color:#667eea;"></i>填写API地址和Key后将调用该AI服务，留空走系统默认通道
+                            </div>
+                            <!-- 错误提示 -->
+                            <div id="modelFormError" class="alert alert-danger py-2 px-3 mb-2" style="display:none; border-radius:8px; font-size:0.82rem; cursor:pointer;" onclick="this.style.display='none'">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                <span id="modelFormErrorText"></span>
+                            </div>
+                            <!-- 操作按钮 -->
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-primary" id="saveModelBtn">
+                                    <i class="fas fa-save me-1"></i>保存
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="cancelEditModelBtn" style="display:none;">
+                                    <i class="fas fa-times me-1"></i>取消
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 模型列表 -->
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fw-semibold" style="font-size:0.9rem; color:#555;">
+                            <i class="fas fa-list me-1" style="color:#667eea;"></i>已配置的模型
+                        </span>
+                    </div>
+                    <div id="modelListBody" class="model-card-list">
+                        <div class="model-empty-state"><i class="fas fa-spinner fa-spin"></i>加载中...</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">关闭</button>
                 </div>
             </div>
         </div>
@@ -734,34 +974,68 @@
             topPValue.textContent = e.target.value;
         });
 
+        // 加载模型列表到下拉框
+        async function loadModelList() {
+            try {
+                const response = await fetch('/api/custom-models');
+                if (response.ok) {
+                    const models = await response.json();
+                    const select = document.getElementById('aiModel');
+                    const currentValue = select.value;
+                    select.innerHTML = '<option value="" disabled>请选择AI模型</option>';
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.modelId;
+                        option.textContent = model.displayName;
+                        select.appendChild(option);
+                    });
+                    // 恢复之前选中的模型，如果之前有值且仍存在于列表中
+                    if (currentValue) {
+                        select.value = currentValue;
+                    }
+                    return models;
+                }
+            } catch (error) {
+                console.error('加载模型列表失败:', error);
+            }
+            return [];
+        }
+
         // 加载当前AI配置
+        let currentModelName = 'qwen-turbo';
         async function loadAiConfig() {
             try {
+                // 先加载模型列表
+                await loadModelList();
+
                 const response = await fetch('/api/ai-config');
                 if (response.ok) {
                     const data = await response.json();
-                    const currentConfig = data.currentConfig;
+                    const config = data.currentConfig;
+                    currentModelName = config.modelName;
                     
                     // 设置当前配置
-                    document.getElementById('aiModel').value = currentConfig.modelName;
-                    document.getElementById('aiTemperature').value = currentConfig.temperature;
-                    document.getElementById('aiMaxTokens').value = currentConfig.maxTokens;
-                    document.getElementById('aiTopP').value = currentConfig.topP;
+                    document.getElementById('aiModel').value = config.modelName;
+                    document.getElementById('aiTemperature').value = config.temperature;
+                    document.getElementById('aiMaxTokens').value = config.maxTokens;
+                    document.getElementById('aiTopP').value = config.topP;
                     
                     // 更新显示值
-                    temperatureValue.textContent = currentConfig.temperature;
-                    topPValue.textContent = currentConfig.topP;
+                    temperatureValue.textContent = config.temperature;
+                    topPValue.textContent = config.topP;
                 }
             } catch (error) {
                 console.error('加载AI配置失败，使用默认配置:', error);
-                // 使用默认配置
                 setDefaultAiConfig();
             }
         }
         
         // 设置默认AI配置
         function setDefaultAiConfig() {
-            document.getElementById('aiModel').value = 'qwen-turbo';
+            const select = document.getElementById('aiModel');
+            if (select.options.length > 0) {
+                select.selectedIndex = 0;
+            }
             document.getElementById('aiTemperature').value = '0.1';
             document.getElementById('aiMaxTokens').value = '4000';
             document.getElementById('aiTopP').value = '0.7';
@@ -769,6 +1043,230 @@
             temperatureValue.textContent = '0.1';
             topPValue.textContent = '0.7';
         }
+
+        // ==================== 模型管理功能 ====================
+
+        // 打开模型管理模态框
+        document.getElementById('manageModelsBtn').addEventListener('click', () => {
+            resetModelForm();
+            loadModelListInModal();
+            const modal = new bootstrap.Modal(document.getElementById('modelManageModal'));
+            modal.show();
+        });
+
+        // 重置模型表单
+        function resetModelForm() {
+            document.getElementById('editModelId').value = '';
+            const modelIdInput = document.getElementById('modelIdInput');
+            modelIdInput.value = '';
+            modelIdInput.disabled = false;
+            modelIdInput.classList.remove('is-invalid');
+            const displayNameInput = document.getElementById('modelDisplayNameInput');
+            displayNameInput.value = '';
+            displayNameInput.classList.remove('is-invalid');
+            document.getElementById('modelDescriptionInput').value = '';
+            document.getElementById('modelApiUrlInput').value = '';
+            document.getElementById('modelApiKeyInput').value = '';
+            document.getElementById('modelApiTypeInput').value = 'openai_compatible';
+            document.getElementById('modelFormTitle').textContent = '新增模型';
+            document.getElementById('modelFormIcon').className = 'fas fa-plus-circle';
+            document.getElementById('cancelEditModelBtn').style.display = 'none';
+            hideModelFormError();
+        }
+
+        // 加载模型列表到模态框
+        async function loadModelListInModal() {
+            try {
+                const response = await fetch('/api/custom-models');
+                if (response.ok) {
+                    const models = await response.json();
+                    renderModelList(models);
+                }
+            } catch (error) {
+                document.getElementById('modelListBody').innerHTML =
+                    '<div class="model-empty-state"><i class="fas fa-exclamation-circle text-danger"></i>加载失败</div>';
+            }
+        }
+
+        // 渲染模型列表（卡片式）
+        function renderModelList(models) {
+            const container = document.getElementById('modelListBody');
+            if (models.length === 0) {
+                container.innerHTML = '<div class="model-empty-state"><i class="fas fa-inbox"></i>暂无模型，请在上方添加</div>';
+                return;
+            }
+            const typeColors = { dashscope: '#28a745', hengnao: '#6f42c1', openai_compatible: '#0d6efd' };
+            const typeLabels  = { dashscope: 'DashScope', hengnao: '恒脑', openai_compatible: 'OpenAI' };
+            container.innerHTML = models.map(model => {
+                const urlShort = model.apiUrl
+                    ? escapeHtml(model.apiUrl.replace(/^https?:\/\//, '').substring(0, 45) + (model.apiUrl.length > 50 ? '...' : ''))
+                    : '';
+                const color = typeColors[model.apiType] || '#6c757d';
+                const label = typeLabels[model.apiType] || model.apiType || '-';
+                const hasKey = model.hasApiKey
+                    ? '<i class="fas fa-key ms-2" style="color:#f0ad4e; font-size:0.7rem;" title="已配置Key"></i>'
+                    : '';
+                return `
+                <div class="model-card-item">
+                    <span class="model-name">${escapeHtml(model.displayName)}</span>
+                    <span class="model-id">${escapeHtml(model.modelId)}${hasKey}</span>
+                    <span class="model-url" title="${escapeHtml(model.apiUrl || '')}">${urlShort || '<span style="color:#ccc;">默认通道</span>'}</span>
+                    <span class="model-type-badge" style="background:${color}15; color:${color}; border:1px solid ${color}30;">${label}</span>
+                    <div class="model-actions">
+                        <button class="btn btn-outline-primary" onclick="editModel(${model.id})" title="编辑"><i class="fas fa-pen"></i></button>
+                        <button class="btn btn-outline-danger" onclick="deleteModel(${model.id}, '${escapeHtml(model.displayName)}')" title="删除"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 显示模型表单内联错误
+        function showModelFormError(msg) {
+            const errDiv = document.getElementById('modelFormError');
+            document.getElementById('modelFormErrorText').textContent = msg;
+            errDiv.style.display = 'block';
+        }
+        function hideModelFormError() {
+            document.getElementById('modelFormError').style.display = 'none';
+        }
+
+        // 保存模型（新增或更新）
+        document.getElementById('saveModelBtn').addEventListener('click', async () => {
+            const editId = document.getElementById('editModelId').value;
+            const modelIdInput = document.getElementById('modelIdInput');
+            const displayNameInput = document.getElementById('modelDisplayNameInput');
+            const modelId = modelIdInput.value.trim();
+            const displayName = displayNameInput.value.trim();
+            const description = document.getElementById('modelDescriptionInput').value.trim();
+            const apiUrl = document.getElementById('modelApiUrlInput').value.trim();
+            const apiKey = document.getElementById('modelApiKeyInput').value.trim();
+            const apiType = document.getElementById('modelApiTypeInput').value;
+
+            // 清除上次的错误状态
+            modelIdInput.classList.remove('is-invalid');
+            displayNameInput.classList.remove('is-invalid');
+            hideModelFormError();
+
+            if (!modelId && !displayName) {
+                modelIdInput.classList.add('is-invalid');
+                displayNameInput.classList.add('is-invalid');
+                showModelFormError('请填写模型ID和显示名称');
+                return;
+            }
+            if (!modelId) {
+                modelIdInput.classList.add('is-invalid');
+                showModelFormError('请填写模型ID');
+                return;
+            }
+            if (!displayName) {
+                displayNameInput.classList.add('is-invalid');
+                showModelFormError('请填写显示名称');
+                return;
+            }
+
+            try {
+                let response;
+                const payload = { modelId, displayName, description, apiUrl, apiKey, apiType, isDefault: false };
+                if (editId) {
+                    // 更新时如果 apiKey 为空则不覆盖已有的 key
+                    if (!apiKey) delete payload.apiKey;
+                    response = await fetch('/api/custom-models/' + editId, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    response = await fetch('/api/custom-models', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    showToast('success', '操作成功', result.message);
+                    resetModelForm();
+                    loadModelListInModal();
+                    // 同步刷新页面的模型下拉框
+                    await loadModelList();
+                    // 恢复之前选中的模型
+                    if (currentModelName) {
+                        document.getElementById('aiModel').value = currentModelName;
+                    }
+                } else {
+                    showToast('error', '操作失败', result.error || '未知错误');
+                }
+            } catch (error) {
+                showToast('error', '操作失败', error.message);
+            }
+        });
+
+        // 编辑模型（从服务器获取完整数据）
+        window.editModel = async function(id) {
+            try {
+                const response = await fetch('/api/custom-models');
+                if (response.ok) {
+                    const models = await response.json();
+                    const model = models.find(m => m.id === id);
+                    if (model) {
+                        document.getElementById('editModelId').value = model.id;
+                        document.getElementById('modelIdInput').value = model.modelId;
+                        document.getElementById('modelIdInput').disabled = true;
+                        document.getElementById('modelDisplayNameInput').value = model.displayName;
+                        document.getElementById('modelDescriptionInput').value = model.description || '';
+                        document.getElementById('modelApiUrlInput').value = model.apiUrl || '';
+                        // API Key 显示脱敏提示
+                        document.getElementById('modelApiKeyInput').value = '';
+                        document.getElementById('modelApiKeyInput').placeholder = model.hasApiKey ? '已配置（留空保持不变）' : 'sk-xxxxxxxx';
+                        document.getElementById('modelApiTypeInput').value = model.apiType || 'openai_compatible';
+                        document.getElementById('modelFormTitle').textContent = '编辑模型';
+                        document.getElementById('modelFormIcon').className = 'fas fa-pen-to-square';
+                        document.getElementById('cancelEditModelBtn').style.display = 'inline-block';
+                    }
+                }
+            } catch (error) {
+                showToast('error', '加载失败', '获取模型详情失败');
+            }
+        };
+
+        // 取消编辑
+        document.getElementById('cancelEditModelBtn').addEventListener('click', resetModelForm);
+
+        // 删除模型
+        window.deleteModel = async function(id, displayName) {
+            if (!confirm('确定要删除模型 "' + displayName + '" 吗？')) return;
+            try {
+                const response = await fetch('/api/custom-models/' + id, { method: 'DELETE' });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    showToast('success', '删除成功', result.message);
+                    loadModelListInModal();
+                    await loadModelList();
+                    if (currentModelName) {
+                        document.getElementById('aiModel').value = currentModelName;
+                    }
+                } else {
+                    showToast('error', '删除失败', result.error || '未知错误');
+                }
+            } catch (error) {
+                showToast('error', '删除失败', error.message);
+            }
+        };
+
+        // 记录模型选择变化，并清除错误提示
+        document.getElementById('aiModel').addEventListener('change', (e) => {
+            currentModelName = e.target.value;
+            e.target.classList.remove('is-invalid');
+            document.getElementById('aiModelError').style.display = 'none';
+        });
 
         // 页面加载时获取AI配置
         document.addEventListener('DOMContentLoaded', loadAiConfig);
@@ -781,6 +1279,17 @@
                 showToast('warning', '请选择文件', '请选择要上传的文件！');
                 return;
             }
+
+            const aiModelSelect = document.getElementById('aiModel');
+            const aiModelError = document.getElementById('aiModelError');
+            if (!aiModelSelect.value) {
+                aiModelSelect.classList.add('is-invalid');
+                aiModelError.style.display = 'block';
+                aiModelSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            aiModelSelect.classList.remove('is-invalid');
+            aiModelError.style.display = 'none';
 
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
