@@ -329,7 +329,7 @@ public class AiCodeGenerationService {
      */
     private String buildApiAnalysisPrompt(String documentContent) {
         return String.format("""
-            请分析以下API文档内容，提取所有API端点信息。无论存在几个端点，请均以JSON数组格式返回结果，多个端点通过逗号分隔。
+            请分析以下API文档内容，提取所有API端点信息。无论存在几个端点，请均以JSON数组格式返回结果，多个端点通过逗号分隔，不要体现思考过程，直接返回JSON数组格式的API端点信息。
             JSON格式如下：
             [{
                 "name": "端点名称",
@@ -1074,24 +1074,44 @@ public class AiCodeGenerationService {
         if (jsonContent == null || jsonContent.trim().isEmpty()) {
             return "[]";
         }
-        
+
         log.info("开始处理JSON内容，原始长度: {}", jsonContent.length());
-        
-        // 移除可能的markdown代码块标记
+
         String cleaned = jsonContent.trim();
+
+        // 1. 优先移除思考/推理块（如MiniMax M3等模型会返回<think>...</think>内容）
+        //    必须在markdown标记检测之前执行，否则会错过开头的```json标记
+        int beforeThinkLen = cleaned.length();
+        cleaned = cleaned.replaceAll("(?is)<\\s*think\\s*>.*?<\\s*/\\s*think\\s*>", "");
+        cleaned = cleaned.replaceAll("(?is)<\\s*thinking\\s*>.*?<\\s*/\\s*thinking\\s*>", "");
+        cleaned = cleaned.replaceAll("(?is)&lt;\\s*think\\s*&gt;.*?&lt;\\s*/\\s*think\\s*&gt;", "");
+        if (cleaned.length() != beforeThinkLen) {
+            log.info("移除了思考块，减少字符数: {}", beforeThinkLen - cleaned.length());
+        }
+        // think块移除后可能留下前导换行/空格，需要重新trim
+        cleaned = cleaned.trim();
+
+        // 2. 移除可能的markdown代码块标记
+        //    处理多行（```json\n...\n```）和同行（```json [...]`）两种情况
         if (cleaned.startsWith("```json")) {
             cleaned = cleaned.substring(7);
             log.info("移除了```json标记");
-        }
-        if (cleaned.startsWith("```")) {
+        } else if (cleaned.startsWith("```")) {
             cleaned = cleaned.substring(3);
             log.info("移除了```标记");
+        } else {
+            // 防御性处理：有些模型输出```json前会带有其他文本，尝试从任意位置删除一个```json块标记
+            int jsonMarkerIdx = cleaned.indexOf("```json");
+            if (jsonMarkerIdx >= 0 && jsonMarkerIdx < 50) {
+                cleaned = cleaned.substring(jsonMarkerIdx + 7).trim();
+                log.info("从位置{}处移除了```json标记", jsonMarkerIdx);
+            }
         }
         if (cleaned.endsWith("```")) {
             cleaned = cleaned.substring(0, cleaned.length() - 3);
             log.info("移除了结尾的```标记");
         }
-        
+
         cleaned = cleaned.trim();
         log.info("清理后长度: {}", cleaned.length());
         

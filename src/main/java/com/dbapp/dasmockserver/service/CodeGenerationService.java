@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -79,39 +80,46 @@ public class CodeGenerationService {
                 <version>0.0.1-SNAPSHOT</version>
                 <name>%s</name>
                 <description>%s</description>
-                
+
                 <properties>
                     <java.version>17</java.version>
                     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
                     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
                     <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
                 </properties>
-                
+
                 <dependencies>
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-web</artifactId>
                     </dependency>
-                    
+
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-validation</artifactId>
                     </dependency>
-                    
+
                     <dependency>
                         <groupId>com.fasterxml.jackson.core</groupId>
                         <artifactId>jackson-databind</artifactId>
                     </dependency>
-                    
+
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-test</artifactId>
                         <scope>test</scope>
                     </dependency>
                 </dependencies>
-                
+
                 <build>
                     <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-resources-plugin</artifactId>
+                            <configuration>
+                                <encoding>UTF-8</encoding>
+                            </configuration>
+                        </plugin>
                         <plugin>
                             <groupId>org.springframework.boot</groupId>
                             <artifactId>spring-boot-maven-plugin</artifactId>
@@ -122,13 +130,14 @@ public class CodeGenerationService {
                     </plugins>
                 </build>
             </project>
-            """, 
+            """,
             sanitizeProjectName(mockService.getName()),
-            mockService.getName(),
-            mockService.getDescription() != null ? mockService.getDescription() : "Generated Mock Server"
+            escapeXml(safeProjectName(mockService.getName())),
+            escapeXml(mockService.getDescription() != null ? mockService.getDescription() : "Generated Mock Server")
         );
-        
-        Files.write(Paths.get(projectPath, "pom.xml"), pomContent.getBytes());
+
+        // 统一使用 UTF-8 写入，避免 Windows GBK 平台默认编码导致中文字符被解析为 MalformedInputException
+        Files.write(Paths.get(projectPath, "pom.xml"), pomContent.getBytes(StandardCharsets.UTF_8));
     }
     
     /**
@@ -1060,31 +1069,32 @@ public class CodeGenerationService {
         String propertiesContent = String.format("""
             # 服务器配置
             server.port=%d
-            
+
             # 应用名称
             spring.application.name=%s
-            
+
             # 日志配置
             logging.level.com.dbapp=DEBUG
             logging.pattern.console=%%d{yyyy-MM-dd HH:mm:ss.SSS} [%%thread] %%-5level %%logger{36} - %%msg%%n
             logging.charset.console=UTF-8
             logging.charset.file=UTF-8
-            
+
             # Jackson配置
             spring.jackson.default-property-inclusion=non_null
             spring.jackson.encoding=UTF-8
-            
+
             # 文件编码配置
             spring.http.encoding.charset=UTF-8
             spring.http.encoding.enabled=true
             spring.http.encoding.force=true
-            """, 
+            """,
             mockService.getPort(),
-            mockService.getName()
+            escapeProperties(safeProjectName(mockService.getName()))
         );
-        
-        Files.write(Paths.get(projectPath, "src/main/resources/application.properties"), 
-            propertiesContent.getBytes());
+
+        // 统一使用 UTF-8 写入，避免 Windows GBK 平台默认编码导致中文字符被解析为 MalformedInputException
+        Files.write(Paths.get(projectPath, "src/main/resources/application.properties"),
+            propertiesContent.getBytes(StandardCharsets.UTF_8));
     }
     
     /**
@@ -1118,7 +1128,8 @@ public class CodeGenerationService {
             java.time.LocalDateTime.now()
         );
         
-        Files.write(Paths.get(projectPath, "README.md"), readmeContent.getBytes());
+        // 统一使用 UTF-8 写入，避免 Windows GBK 平台默认编码导致中文字符被解析为 MalformedInputException
+        Files.write(Paths.get(projectPath, "README.md"), readmeContent.getBytes(StandardCharsets.UTF_8));
     }
     
     /**
@@ -1128,21 +1139,82 @@ public class CodeGenerationService {
         if (name == null || name.trim().isEmpty()) {
             return "example";
         }
-        
+
         // 移除特殊符号，只保留字母、数字
         String cleaned = name.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
-        
+
         // 如果清理后为空，使用默认名称
         if (cleaned.trim().isEmpty()) {
             return "example";
         }
-        
+
         // 确保不以数字开头
         if (Character.isDigit(cleaned.charAt(0))) {
             cleaned = "pkg" + cleaned;
         }
-        
+
         return cleaned;
+    }
+
+    /**
+     * 生成适用于文件名、properties 名称等场景的安全名称。
+     * 策略：去除不合规字符，空时使用默认名，并限制最大长度。
+     */
+    public String safeProjectName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "mock-service";
+        }
+        // 去除 ASCII 控制字符及 XML/properties 不安全字符（包括中文字符）
+        String cleaned = name.replaceAll("[\\p{Cntrl}<>\"'&=:\\\\/\\s]+", "_");
+        // 限制最大长度避免文件名超长
+        if (cleaned.length() > 80) {
+            cleaned = cleaned.substring(0, 80);
+        }
+        if (cleaned.trim().isEmpty() || "_".equals(cleaned)) {
+            return "mock-service";
+        }
+        return cleaned;
+    }
+
+    /**
+     * XML 特殊字符转义，防止描述/名称中的 & < > 等破坏 XML 结构
+     */
+    public String escapeXml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;");
+    }
+
+    /**
+     * properties 文件特殊字符转义，防止 = : # ! 等破坏 properties 格式
+     */
+    public String escapeProperties(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(value.length() + 16);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            // properties 里的转义字符
+            switch (c) {
+                case '\\': sb.append("\\\\"); break;
+                case '=': sb.append("\\="); break;
+                case ':': sb.append("\\:"); break;
+                case '#': sb.append("\\#"); break;
+                case '!': sb.append("\\!"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default: sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     /**
