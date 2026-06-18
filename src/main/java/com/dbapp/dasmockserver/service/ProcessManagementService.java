@@ -7,7 +7,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -25,6 +29,12 @@ public class ProcessManagementService {
     
     // 存储服务端口信息
     private final Map<Long, Integer> servicePorts = new ConcurrentHashMap<>();
+
+    /**
+     * 端口重试上限：超过此次数认为从首选端口起无足够可用端口。
+     * 避免在端口被密集占用场景下陷入死循环。
+     */
+    private static final int MAX_PORT_RETRY = 500;
     
     /**
      * 初始化时清理可能残留的进程
@@ -50,18 +60,24 @@ public class ProcessManagementService {
             java.io.BufferedReader reader = new java.io.BufferedReader(
                 new java.io.InputStreamReader(process.getInputStream())
             );
-            
+
             String line;
+            int suspectCount = 0;
             while ((line = reader.readLine()) != null) {
-                // 检查是否包含Spring Boot相关的进程
+                // 检查是否包含Spring Boot相关的进程（精简日志：只统计数量，发现可疑进程时才打 warn）
                 if (line.contains("spring-boot:run") || line.contains("MockController")) {
-                    log.warn("发现可能残留的Mock Server进程: {}", line);
-                    // 这里可以添加自动清理逻辑，但为了安全起见，暂时只记录日志
+                    suspectCount++;
+                    if (suspectCount <= 3) {
+                        log.warn("发现可能残留的Mock Server进程: {}", line);
+                    }
                 }
             }
-            
+
             process.waitFor();
-            log.info("进程清理检查完成");
+            if (suspectCount > 3) {
+                log.warn("可能残留的Mock Server进程共 {} 个（仅显示前 3 条）", suspectCount);
+            }
+            log.info("进程清理检查完成，共扫描 {} 条匹配项", suspectCount);
             
         } catch (Exception e) {
             log.error("清理残留进程时发生错误", e);
@@ -70,24 +86,36 @@ public class ProcessManagementService {
     
     /**
      * 启动Mock Server进程
+     * @return 实际使用的端口号（端口冲突时自动递增寻找），失败返回 null
      */
-    public boolean startMockServer(Long serviceId, String projectPath, Integer port) {
+    public Integer startMockServer(Long serviceId, String projectPath, Integer preferredPort) {
         try {
             // 检查项目路径是否存在
             Path projectDir = Paths.get(projectPath);
             if (!Files.exists(projectDir)) {
                 log.error("项目路径不存在: {}", projectPath);
-                return false;
+                return null;
             }
-            
+
             // 检查是否已经有进程在运行
             if (runningProcesses.containsKey(serviceId)) {
                 log.warn("服务 {} 已经在运行中", serviceId);
-                return true;
+                Integer existingPort = servicePorts.get(serviceId);
+                return existingPort != null ? existingPort : preferredPort;
             }
-            
+
+            // 端口冲突检测与自动重选
+            Integer actualPort = resolveAvailablePort(preferredPort);
+            if (actualPort == null) {
+                log.error("无法为服务 {} 找到可用端口（首选端口: {}，已达最大重试次数）", serviceId, preferredPort);
+                return null;
+            }
+            if (!actualPort.equals(preferredPort)) {
+                log.warn("首选端口 {} 被占用，服务 {} 自动切换到端口 {}", preferredPort, serviceId, actualPort);
+            }
+
             // 构建启动命令
-            String[] command = buildStartCommand(projectPath, port);
+            String[] command = buildStartCommand(projectPath, actualPort);
             
             // 创建进程构建器
             ProcessBuilder processBuilder = new ProcessBuilder(command);
@@ -101,15 +129,15 @@ public class ProcessManagementService {
             // 重定向错误流到标准输出
             processBuilder.redirectErrorStream(true);
             
-            log.info("启动Mock Server: serviceId={}, projectPath={}, port={}", serviceId, projectPath, port);
+            log.info("启动Mock Server: serviceId={}, projectPath={}, port={}", serviceId, projectPath, actualPort);
             log.info("执行命令: {}", String.join(" ", command));
-            
+
             // 启动进程
             Process process = processBuilder.start();
-            
+
             // 存储进程信息
             runningProcesses.put(serviceId, process);
-            
+
             // 启动日志收集线程
             startLogCollector(serviceId, process);
 
@@ -118,28 +146,93 @@ public class ProcessManagementService {
             int waitTimeOut = 0;
             while(waitTimeOut < 30 && javaPid < 0){
                 // 循环等待等待一段时间让Java进程启动
-                log.info("正在等待Mock Server启动: serviceId={}, port={}", serviceId, port);
+                log.info("正在等待Mock Server启动: serviceId={}, port={}", serviceId, actualPort);
                 Thread.sleep(1000);
                 waitTimeOut++;
-                javaPid = findJavaProcessId(serviceId, port);
+                javaPid = findJavaProcessId(serviceId, actualPort);
             }
 
             if (javaPid > 0) {
                 processIds.put(serviceId, javaPid);
-                servicePorts.put(serviceId, port);
-                log.info("Mock Server启动成功: serviceId={}, javaPid={}, port={}", serviceId, javaPid, port);
-                return true;
+                servicePorts.put(serviceId, actualPort);
+                log.info("Mock Server启动成功: serviceId={}, javaPid={}, port={}", serviceId, javaPid, actualPort);
+                return actualPort;
             } else {
                 log.error("Mock Server启动失败，未找到Java进程: serviceId={}", serviceId);
                 cleanupProcess(serviceId);
-                return false;
+                return null;
             }
-            
+
         } catch (Exception e) {
             log.error("启动Mock Server时发生错误: serviceId={}", serviceId, e);
             cleanupProcess(serviceId);
-            return false;
+            return null;
         }
+    }
+
+    /**
+     * 检测首选端口是否被占用；若被占用，从下一个端口起递增寻找可用端口。
+     * 最多尝试 {@link #MAX_PORT_RETRY} 次，避免无限循环。
+     */
+    private Integer resolveAvailablePort(Integer preferredPort) {
+        if (preferredPort == null) {
+            return null;
+        }
+        if (!isPortInUse(preferredPort)) {
+            return preferredPort;
+        }
+        int tryPort = preferredPort + 1;
+        int maxPort = 65535;
+        for (int tried = 0; tried < MAX_PORT_RETRY && tryPort <= maxPort; tried++, tryPort++) {
+            if (!isPortInUse(tryPort)) {
+                return tryPort;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 查找一个系统级未被占用且不在 excludePorts 中的可用端口。
+     * 主要用于服务创建时的初始端口分配。
+     *
+     * @param startPort    起始端口（包含）
+     * @param excludePorts 需排除的端口集合（如数据库中已记录的端口），可传 null
+     * @return 可用端口；找不到返回 null
+     */
+    public Integer findAvailablePort(int startPort, Set<Integer> excludePorts) {
+        int tryPort = Math.max(1024, startPort);
+        int maxPort = 65535;
+        for (int tried = 0; tried < MAX_PORT_RETRY && tryPort <= maxPort; tried++, tryPort++) {
+            boolean inExclude = excludePorts != null && excludePorts.contains(tryPort);
+            if (!inExclude && !isPortInUse(tryPort)) {
+                return tryPort;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 一键停止所有运行中的Mock Server
+     *
+     * @return 已成功停止的服务ID列表
+     */
+    public List<Long> stopAllMockServers() {
+        List<Long> stoppedIds = new ArrayList<>();
+        // 复制 keySet 避免 stopMockServer 内清理时出现并发修改异常
+        List<Long> ids = new ArrayList<>(runningProcesses.keySet());
+        Collections.sort(ids);
+        log.info("一键停止所有Mock Server，待停止数量: {}", ids.size());
+        for (Long serviceId : ids) {
+            try {
+                if (stopMockServer(serviceId)) {
+                    stoppedIds.add(serviceId);
+                }
+            } catch (Exception e) {
+                log.error("停止服务 {} 失败: {}", serviceId, e.getMessage(), e);
+            }
+        }
+        log.info("一键停止完成，成功停止 {} 个服务: {}", stoppedIds.size(), stoppedIds);
+        return stoppedIds;
     }
     
     /**Å
@@ -376,9 +469,9 @@ public class ProcessManagementService {
             );
             
             String line;
+            int scannedLines = 0;
             while ((line = reader.readLine()) != null) {
-                log.debug("netstat/lsof输出: {}", line);
-                
+                // 匹配占用端口的进程（精简日志：不再逐行打印 netstat/lsof 输出）
                 if (os.contains("win")) {
                     // Windows格式: TCP 0.0.0.0:8080 0.0.0.0:0 LISTENING 1234
                     if (line.contains(":" + port) && line.contains("LISTENING")) {
@@ -603,6 +696,7 @@ public class ProcessManagementService {
                 new java.io.InputStreamReader(process.getInputStream())
             );
             
+            // 静默读取端口扫描结果，仅在调试级别需要时开启
             String line;
             boolean portInUse = false;
             while ((line = reader.readLine()) != null) {
@@ -622,9 +716,8 @@ public class ProcessManagementService {
             }
             
             process.waitFor();
-            log.debug("端口 {} 占用状态: {}", port, portInUse);
             return portInUse;
-            
+
         } catch (Exception e) {
             log.error("检查端口占用状态时发生错误: port={}", port, e);
             return false;

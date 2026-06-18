@@ -225,46 +225,52 @@ public class MockServerService {
     /**
      * 启动Mock服务
      */
-    public boolean startMockService(Long serviceId) {
+    public MockService startMockService(Long serviceId) {
         Optional<MockService> optional = mockServiceRepository.findById(serviceId);
         if (optional.isPresent()) {
             MockService mockService = optional.get();
-            
+
             // 检查服务是否已经在运行
             if (processManagementService.isServiceRunning(serviceId)) {
                 log.warn("服务 {} 已经在运行中", serviceId);
                 mockService.setStatus(MockService.ServiceStatus.RUNNING);
                 mockServiceRepository.save(mockService);
-                return true;
+                return mockService;
             }
-            
+
             // 从数据库获取项目路径
             String projectPath = mockService.getProjectPath();
             if (projectPath == null || projectPath.trim().isEmpty()) {
                 log.error("服务 {} 的项目路径为空", serviceId);
                 mockService.setStatus(MockService.ServiceStatus.ERROR);
                 mockServiceRepository.save(mockService);
-                return false;
+                return mockService;
             }
-            
-            // 启动进程
-            boolean started = processManagementService.startMockServer(serviceId, projectPath, mockService.getPort());
-            
-            if (started) {
+
+            Integer preferredPort = mockService.getPort();
+            // 启动进程（端口冲突时内部自动重选）
+            Integer actualPort = processManagementService.startMockServer(serviceId, projectPath, preferredPort);
+
+            if (actualPort != null) {
                 mockService.setStatus(MockService.ServiceStatus.RUNNING);
+                // 端口被自动重选后，同步更新数据库中的端口与访问地址
+                if (!actualPort.equals(preferredPort)) {
+                    mockService.setPort(actualPort);
+                    mockService.setBaseUrl(networkUtil.buildServiceUrl(actualPort));
+                }
                 mockServiceRepository.save(mockService);
-                log.info("Mock服务启动成功: serviceId={}, port={}", serviceId, mockService.getPort());
-                return true;
+                log.info("Mock服务启动成功: serviceId={}, port={}", serviceId, actualPort);
+                return mockService;
             } else {
                 mockService.setStatus(MockService.ServiceStatus.ERROR);
                 mockServiceRepository.save(mockService);
                 log.error("Mock服务启动失败: serviceId={}", serviceId);
-                return false;
+                return mockService;
             }
         }
-        return false;
+        return null;
     }
-    
+
     /**
      * 停止Mock服务
      */
@@ -272,10 +278,10 @@ public class MockServerService {
         Optional<MockService> optional = mockServiceRepository.findById(serviceId);
         if (optional.isPresent()) {
             MockService mockService = optional.get();
-            
+
             // 停止进程
             boolean stopped = processManagementService.stopMockServer(serviceId);
-            
+
             if (stopped) {
                 mockService.setStatus(MockService.ServiceStatus.STOPPED);
                 mockServiceRepository.save(mockService);
@@ -287,6 +293,35 @@ public class MockServerService {
             }
         }
         return false;
+    }
+
+    /**
+     * 一键停止所有运行中的Mock服务，同步将数据库状态置为 STOPPED。
+     *
+     * @return 被停止的服务数量
+     */
+    public int stopAllServices() {
+        java.util.List<Long> stoppedIds = processManagementService.stopAllMockServers();
+        int updated = 0;
+        for (Long serviceId : stoppedIds) {
+            mockServiceRepository.findById(serviceId).ifPresent(s -> {
+                s.setStatus(MockService.ServiceStatus.STOPPED);
+                mockServiceRepository.save(s);
+            });
+            updated++;
+        }
+        // 同时刷新数据库中所有 RUNNING 但未被进程管理器纳入的服务（防御性处理）
+        mockServiceRepository.findAll().stream()
+                .filter(s -> s.getStatus() == MockService.ServiceStatus.RUNNING)
+                .filter(s -> !stoppedIds.contains(s.getId()))
+                .forEach(s -> {
+                    if (!processManagementService.isServiceRunning(s.getId())) {
+                        s.setStatus(MockService.ServiceStatus.STOPPED);
+                        mockServiceRepository.save(s);
+                    }
+                });
+        log.info("一键停止完成，同步状态的服务数量: {}", updated);
+        return updated;
     }
     
     /**
@@ -405,25 +440,18 @@ public class MockServerService {
     
     /**
      * 获取可用端口
+     * 组合检查：数据库已用端口 + 系统级端口占用
      */
     public Integer getAvailablePort() {
         // 获取所有已使用的端口
-        List<Integer> usedPorts = mockServiceRepository.findAll().stream()
-                .map(MockService::getPort)
-                .toList();
-        
-        // 从8081开始查找可用端口
-        int startPort = 8081;
-        int maxPort = 65535;
-        
-        for (int port = startPort; port <= maxPort; port++) {
-            if (!usedPorts.contains(port)) {
-                return port;
+        Set<Integer> usedPorts = new HashSet<>();
+        for (MockService s : mockServiceRepository.findAll()) {
+            if (s.getPort() != null) {
+                usedPorts.add(s.getPort());
             }
         }
-        
-        // 如果没有找到可用端口，返回null
-        return null;
+        // 调用进程管理服务，系统级 + 业务级双重检测
+        return processManagementService.findAvailablePort(8081, usedPorts);
     }
     
     /**

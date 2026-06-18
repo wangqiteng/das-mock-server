@@ -515,9 +515,20 @@
             <div class="container main-content">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h4 class="mb-0">服务列表</h4>
-                <a href="/upload" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus me-1"></i>新建服务
-                </a>
+                <div class="d-flex gap-2">
+                    <button type="button"
+                            class="btn btn-outline-danger btn-sm"
+                            id="stopAllBtn"
+                            onclick="confirmStopAll()"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="bottom"
+                            title="一键停止所有运行中的Mock服务">
+                        <i class="fas fa-stop-circle me-1"></i>一键停止所有
+                    </button>
+                    <a href="/upload" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i>新建服务
+                    </a>
+                </div>
             </div>
             
             <!-- 搜索和过滤区域 -->
@@ -769,6 +780,11 @@
             checkServiceStatuses();
             loadTags();
             initializePagination();
+            // 初始化一键停止按钮的 tooltip
+            const stopAllBtn = document.getElementById('stopAllBtn');
+            if (stopAllBtn && !bootstrap.Tooltip.getInstance(stopAllBtn)) {
+                new bootstrap.Tooltip(stopAllBtn, { trigger: 'hover', placement: 'bottom' });
+            }
         });
         
         // 存储已绑定的事件监听器，避免重复绑定
@@ -1042,7 +1058,7 @@
                 const originalText = deleteButton.innerHTML;
                 deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>删除中...';
                 deleteButton.disabled = true;
-                
+
                 fetch(`/api/mock-server/services/${serviceId}`, {
                     method: 'DELETE'
                 })
@@ -1063,6 +1079,65 @@
                     deleteButton.disabled = false;
                 });
             }
+        }
+
+        /**
+         * 一键停止所有服务 - 确认对话框
+         * 统计当前运行中的服务数量以提高确认体验
+         */
+        function confirmStopAll() {
+            // 统计当前表格中状态为 RUNNING 的服务数量
+            let liveRunning = 0;
+            document.querySelectorAll('tbody tr .status-badge').forEach(badge => {
+                if (badge.textContent.trim() === 'RUNNING') liveRunning++;
+            });
+
+            if (liveRunning === 0) {
+                showToast('info', '提示', '当前没有运行中的Mock服务');
+                return;
+            }
+
+            showConfirmDialog(
+                'fas fa-stop-circle text-danger',
+                '一键停止所有服务',
+                `当前有 ${liveRunning} 个Mock服务正在运行。确定要全部停止吗？`,
+                stopAllServices
+            );
+        }
+
+        /**
+         * 一键停止所有Mock服务
+         * - 禁用按钮防止重复提交
+         * - 成功后刷新列表
+         * - 错误时恢复按钮
+         */
+        function stopAllServices() {
+            const stopAllBtn = document.getElementById('stopAllBtn');
+            if (!stopAllBtn) return;
+            const originalText = stopAllBtn.innerHTML;
+            stopAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>停止中...';
+            stopAllBtn.disabled = true;
+
+            fetch('/api/mock-server/services/stop-all', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('success', '停止成功', data.message || '所有Mock服务已停止');
+                    // 重新加载服务列表以同步状态
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    showToast('error', '停止失败', data.message || '一键停止服务失败');
+                }
+            })
+            .catch(error => {
+                showToast('error', '停止错误', '一键停止服务时发生错误: ' + error.message);
+            })
+            .finally(() => {
+                stopAllBtn.innerHTML = originalText;
+                stopAllBtn.disabled = false;
+            });
         }
         
         function updateServiceStatus(serviceId, newStatus) {

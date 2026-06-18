@@ -199,15 +199,27 @@ public class MockServerController {
     
     /**
      * 启动Mock服务
+     * 端口冲突时后端会自动递增寻找可用端口，响应中会包含 portChanged/actualPort 提示
      */
     @PostMapping("/services/{id}/start")
     public ResponseEntity<Map<String, Object>> startMockService(@PathVariable Long id) {
-        boolean started = mockServerService.startMockService(id);
-        if (started) {
+        // 启动前先读取首选端口，以便在响应中报告端口是否被自动重选
+        Integer preferredPort = mockServerService.getMockServiceById(id)
+                .map(MockService::getPort).orElse(null);
+        MockService started = mockServerService.startMockService(id);
+        if (started != null) {
+            Integer actualPort = started.getPort();
+            boolean portChanged = preferredPort != null && !preferredPort.equals(actualPort);
+            String message = portChanged
+                    ? "Mock服务启动成功（首选端口 " + preferredPort + " 被占用，已自动切换到 " + actualPort + "）"
+                    : "Mock服务启动成功";
             return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Mock服务启动成功",
-                "serviceId", id
+                    "success", true,
+                    "message", message,
+                    "serviceId", id,
+                    "port", actualPort != null ? actualPort : -1,
+                    "portChanged", portChanged,
+                    "preferredPort", preferredPort != null ? preferredPort : -1
             ));
         } else {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -273,23 +285,37 @@ public class MockServerController {
     }
     
     /**
+     * 一键停止所有Mock服务
+     */
+    @PostMapping("/services/stop-all")
+    public ResponseEntity<Map<String, Object>> stopAllMockServices() {
+        try {
+            int stoppedCount = mockServerService.stopAllServices();
+            String message = stoppedCount > 0
+                    ? "已成功停止 " + stoppedCount + " 个Mock服务"
+                    : "当前没有运行中的Mock服务";
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", message,
+                "stoppedCount", stoppedCount
+            ));
+        } catch (Exception e) {
+            log.error("一键停止Mock服务失败: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(
+                    "success", false,
+                    "message", "一键停止服务时发生错误: " + e.getMessage()
+                ));
+        }
+    }
+
+    /**
      * 清理所有Mock服务进程
      */
     @PostMapping("/services/cleanup")
     public ResponseEntity<Map<String, Object>> cleanupAllServices() {
-        try {
-            // 这里可以添加清理所有服务的逻辑
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "所有Mock服务进程清理完成"
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of(
-                    "success", false,
-                    "message", "清理服务进程时发生错误: " + e.getMessage()
-                ));
-        }
+        // cleanup 语义与 stop-all 一致：停止所有运行中的Mock服务
+        return stopAllMockServices();
     }
     
     /**
