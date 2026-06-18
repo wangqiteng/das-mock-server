@@ -178,7 +178,7 @@
 												host="${server.host}"
 												username="${server.username}"
 												password="${server.password}"
-												command="source /etc/profile &amp;&amp; source ~/.bashrc &amp;&amp; cd /opt/app &amp;&amp; sh start.sh restart"
+												command="source /etc/profile &amp;&amp; source ~/.bashrc &amp;&amp; cd ${server.dir} &amp;&amp; sh start.sh restart"
 												trust="true"
 												failonerror="true"/>
 										<echo message="✓ 服务重启成功"/>

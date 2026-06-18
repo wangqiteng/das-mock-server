@@ -359,7 +359,7 @@ public class MockServerController {
      */
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> health() {
-        return ResponseEntity.ok(Map.of("status", "UP", "message", "AI Mock Server is running"));
+        return ResponseEntity.ok(Map.of("status", "UP", "message", "Das Mock Server is running"));
     }
     
     /**
